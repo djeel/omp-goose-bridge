@@ -39,10 +39,10 @@ describe("routeTask", () => {
     expect(d.role).toBeNull();
   });
 
-  test("prompt long délégué en developer", () => {
+  test("prompt long sans mutation -> architect lecture seule (pas de spawn writer)", () => {
     const d = routeTask("x".repeat(401));
     expect(d.delegate).toBe(true);
-    expect(d.role).toBe("developer");
+    expect(d.role).toBe("architect");
   });
 
   test("raison toujours fournie", () => {

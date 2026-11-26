@@ -15,6 +15,8 @@ import {
   sessionResume,
   sessionStop,
   sessionStopAll,
+  acquireReadOnly,
+  releaseReadOnly,
 } from "../core/session-manager.js";
 import { devStatusMarkdown } from "../core/status.js";
 import { routeTask } from "../core/router.js";
@@ -139,7 +141,14 @@ server.tool(
   "Affiche le panneau OMP Bridge inline dans le chat (sessions, branche, diff, writer)",
   {},
   async () => ({
-    content: [{ type: "text", text: "Panneau OMP Bridge affiché ci-dessus." }],
+    content: [
+      {
+        type: "text",
+        text:
+          "Panneau OMP Bridge affiché ci-dessus. " +
+          `Si rien ne s'affiche (client sans MCP Apps), fallback : http://127.0.0.1:${HTTP_PORT}/`,
+      },
+    ],
     _meta: { ui: { resourceUri: PANEL_URI } },
   })
 );
@@ -230,17 +239,15 @@ server.tool(
       (focus ? "Focus demande : " + focus + "\n\n" : "") +
       "DIFF a auditer :\n" +
       (diff || "(clean - rien a reviewer)");
-    // Session dédiée (read-only) : isolation, pas de collision avec la session partagée.
-    const s = await sessionCreate({ workspace: wsc, label: "review", role: "reviewer" });
+    // Reviewer read-only : session chaude du pool, pas de spawn à froid.
+    const s = await acquireReadOnly({ workspace: wsc, role: "reviewer", label: "review" });
     try {
       const text = await s.rpc.promptAndWait(prompt);
       return { content: [{ type: "text", text: String(text).slice(0, MAX_OUTPUT) }] };
     } catch (e: any) {
       return { content: [{ type: "text", text: "review erreur: " + e.message }] };
     } finally {
-      try {
-        await sessionStop(s.id);
-      } catch {}
+      releaseReadOnly(s);
     }
   }
 );
@@ -276,13 +283,40 @@ server.tool(
       const holder = writerHolder(wsc);
       if (holder) return { content: [{ type: "text", text: "refuse : writer deja actif " + holder + " sur " + wsc }] };
     }
-    const s = await sessionCreate({
-      workspace: wsc,
-      sessionDir: session_dir ? safeSessionPath(session_dir) : undefined,
-      label: label ?? ("auto-" + role),
-      role,
-    });
     const prompt = ROLE_SYSTEM[role] + "\n\nTache : " + task;
+    if (role === "developer") {
+      const s = await sessionCreate({
+        workspace: wsc,
+        sessionDir: session_dir ? safeSessionPath(session_dir) : undefined,
+        label: label ?? ("auto-" + role),
+        role,
+      });
+      // Éphémère : libère le process ET le verrou writer.
+      try {
+        const text = await s.rpc.promptAndWait(prompt);
+        return {
+          content: [{ type: "text", text: "auto route=" + role + " session=" + s.id + "\n" + String(text).slice(0, MAX_OUTPUT) }],
+        };
+      } catch (e: any) {
+        return { content: [{ type: "text", text: "auto route=" + role + " session=" + s.id + " erreur: " + e.message }] };
+      } finally {
+        if (!keep) {
+          try {
+            await sessionStop(s.id);
+          } catch {}
+        }
+      }
+    }
+    // Read-only : session persistante explicite -> cycle create/stop classique ;
+    // sinon pool (session chaude réutilisée, pas de spawn à froid).
+    const s = session_dir
+      ? await sessionCreate({
+          workspace: wsc,
+          sessionDir: safeSessionPath(session_dir),
+          label: label ?? ("auto-" + role),
+          role,
+        })
+      : await acquireReadOnly({ workspace: wsc, role, label: label ?? ("auto-" + role) });
     try {
       const text = await s.rpc.promptAndWait(prompt);
       return {
@@ -291,11 +325,14 @@ server.tool(
     } catch (e: any) {
       return { content: [{ type: "text", text: "auto route=" + role + " session=" + s.id + " erreur: " + e.message }] };
     } finally {
-      // Éphémère par défaut : libère le process ET le verrou writer.
-      if (!keep) {
+      // Persistante explicite -> on ne la mélange pas au pool (évite de
+      // polluer le session_dir avec des appels éphémères).
+      if (session_dir && !keep) {
         try {
           await sessionStop(s.id);
         } catch {}
+      } else {
+        releaseReadOnly(s);
       }
     }
   }
@@ -324,13 +361,38 @@ server.tool(
       const holder = writerHolder(wsc);
       if (holder) return { content: [{ type: "text", text: "refuse : writer deja actif " + holder + " sur " + wsc }] };
     }
-    const s = await sessionCreate({
-      workspace: wsc,
-      sessionDir: session_dir ? safeSessionPath(session_dir) : undefined,
-      label: label ?? role,
-      role: role as Role,
-    });
     const prompt = ROLE_SYSTEM[role as Role] + "\n\nObjectif : " + objective;
+    if (role === "developer") {
+      const s = await sessionCreate({
+        workspace: wsc,
+        sessionDir: session_dir ? safeSessionPath(session_dir) : undefined,
+        label: label ?? role,
+        role: role as Role,
+      });
+      try {
+        const text = await s.rpc.promptAndWait(prompt);
+        return {
+          content: [{ type: "text", text: "session=" + s.id + " role=" + role + "\n" + String(text).slice(0, MAX_OUTPUT) }],
+        };
+      } catch (e: any) {
+        return { content: [{ type: "text", text: "session=" + s.id + " role=" + role + " erreur: " + e.message }] };
+      } finally {
+        if (!keep) {
+          try {
+            await sessionStop(s.id);
+          } catch {}
+        }
+      }
+    }
+    // Read-only : pool sauf session persistante explicite (non mélangée).
+    const s = session_dir
+      ? await sessionCreate({
+          workspace: wsc,
+          sessionDir: safeSessionPath(session_dir),
+          label: label ?? (role as string),
+          role: role as Role,
+        })
+      : await acquireReadOnly({ workspace: wsc, role: role as Role, label: label ?? (role as string) });
     try {
       const text = await s.rpc.promptAndWait(prompt);
       return {
@@ -339,10 +401,12 @@ server.tool(
     } catch (e: any) {
       return { content: [{ type: "text", text: "session=" + s.id + " role=" + role + " erreur: " + e.message }] };
     } finally {
-      if (!keep) {
+      if (session_dir && !keep) {
         try {
           await sessionStop(s.id);
         } catch {}
+      } else {
+        releaseReadOnly(s);
       }
     }
   }

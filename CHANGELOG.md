@@ -2,6 +2,20 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) · [SemVer](https://semver.org/lang/fr/).
 
+## [Unreleased]
+
+### Ajouté
+- Pool de sessions read-only (`acquireReadOnly`/`releaseReadOnly`) : `omp_review`, `omp_auto` et `omp_run_role` non-developer réutilisent une session chaude (fraîcheur 300 s via `OMP_BRIDGE_POOL_IDLE`) au lieu d'un spawn à froid par appel. `developer` reste éphémère.
+- Verrou writer multi-processus : `tryAcquireWriter`/`releaseWriter`/`writerHolder` doublent la Map mémoire d'un verrou fichier atomique (`~/.local/share/omp-bridge/locks/`, `OMP_BRIDGE_LOCKS_DIR` pour les tests, vol après `SESSION_TTL_MS` si crash).
+- `researcher` reçoit `web_search`, `architect`/`reviewer` reçoivent `lsp` (toujours sans edit/write/bash/task).
+- `omp_dev_panel` annonce l'URL fallback locale quand le client ne rend pas les MCP Apps inline.
+- Tests `roles` (whitelist, `gitDiff` propre/hors-dépôt) et `pool` (réutilisation, isolation workspaces, refus developer).
+
+### Corrigé
+- Prompt long sans mot-clé routé en `architect` (lecture seule) au lieu de `developer` : plus de spawn writer à froid par défaut.
+- `gitDiff` en un seul spawn (stat + diff dans le même shell) ; dépôt propre retourne `(clean)` au lieu de `"---"`.
+- Comptes docs : 19 outils (plus 20), 62 tests (plus 41/52).
+
 ## [1.2.0] — 2026-11-26
 
 ### Ajouté

@@ -3,6 +3,11 @@ import { resolve } from "node:path";
 import { symlinkSync, rmSync } from "node:fs";
 
 // Les racines autorisées sont lues au chargement du module : on fixe l'env avant l'import.
+// Verrous fichier isolés dans un tmpdir (pas de pollution de ~/.local/share).
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+process.env.OMP_BRIDGE_LOCKS_DIR = mkdtempSync(join(tmpdir(), "omp-bridge-locks-"));
 process.env.OMP_BRIDGE_ROOTS = "/tmp:/home/test/work";
 const { safeWorkspace, tryAcquireWriter, releaseWriter, writerHolder, safeSessionPath, _resetLocksForTests } =
   await import("../src/workspace/guard.js");
@@ -68,12 +73,23 @@ describe("single-writer lock", () => {
     releaseWriter(ws, "s1");
     expect(writerHolder(ws)).toBeNull();
     expect(() => tryAcquireWriter(ws, "s2")).not.toThrow();
+    releaseWriter(ws, "s2"); // hygiène : pas de fuite fichier vers le test suivant
   });
 
   test("release par un non-holder est sans effet", () => {
     tryAcquireWriter(ws, "s1");
     releaseWriter(ws, "s2");
     expect(writerHolder(ws)).toBe("s1");
+  });
+
+  test("le verrou survit à un reset mémoire (autre processus simulé)", () => {
+    tryAcquireWriter(ws, "s1");
+    _resetLocksForTests(); // simule un second processus (mémoire vide, fichier présent)
+    expect(writerHolder(ws)).toBe("s1");
+    expect(() => tryAcquireWriter(ws, "s2")).toThrow(/verrouillé/);
+    // Le holder d'origine peut toujours libérer.
+    releaseWriter(ws, "s1");
+    expect(writerHolder(ws)).toBeNull();
   });
 });
 

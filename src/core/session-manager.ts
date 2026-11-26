@@ -137,6 +137,7 @@ export async function sessionStop(id: string): Promise<void> {
     await s.rpc.stop();
   } catch {}
   sessions.delete(id);
+  poolIds.delete(id);
   if (s.role === "developer") releaseWriter(s.workspace, id);
   try {
     const { eventAppend } = await import("../events/store.js");
@@ -152,6 +153,60 @@ export async function sessionStopAll(): Promise<number> {
     } catch {}
   }
   return ids.length;
+}
+
+// --- Pool de sessions READ-ONLY : évite un spawn à froid par review/auto ---
+// Developer reste TOUJOURS éphémère (sécurité > perf) : jamais poolé.
+// Le pool est un simple index sur le registre `sessions` : list/sweep/stopAll
+// continuent de voir les sessions au repos (réutilisables si fraîches).
+
+const poolIds = new Set<string>();
+
+/** Fraîcheur max d'une session au repos pour être réutilisée (défaut 300 s). */
+export function poolIdleMs(): number {
+  return (Number(process.env.OMP_BRIDGE_POOL_IDLE ?? 300) || 300) * 1000;
+}
+
+/**
+ * Récupère une session read-only chaude, ou en crée une.
+ * `developer` est refusé : l'écriture reste éphémère (sessionCreate + stop).
+ */
+export async function acquireReadOnly(opts: {
+  workspace: string;
+  role?: Role;
+  label?: string;
+}): Promise<ManagedSession> {
+  const role = opts.role ?? "reviewer";
+  if (role === "developer") {
+    throw new Error("developer n'est jamais poolé : session éphémère via sessionCreate");
+  }
+  const ws = safeWorkspace(opts.workspace);
+  const now = Date.now();
+  // Réclamation synchrone : pas d'await dans le scan, deux acquire
+  // concurrents ne peuvent pas récupérer la même session.
+  for (const s of sessions.values()) {
+    if (
+      poolIds.has(s.id) &&
+      s.role === role &&
+      s.workspace === ws &&
+      s.rpc.isRunning() &&
+      now - s.lastUsed < poolIdleMs()
+    ) {
+      poolIds.delete(s.id);
+      s.lastUsed = now;
+      if (opts.label) s.label = opts.label;
+      return s;
+    }
+  }
+  return sessionCreate({ workspace: ws, role, label: opts.label ?? role });
+}
+
+/** Rend une session read-only au pool (reste vivante pour le prochain appel). */
+export function releaseReadOnly(s: ManagedSession): void {
+  if (!sessions.has(s.id)) return;
+  if (s.role === "developer") return;
+  s.lastUsed = Date.now();
+  poolIds.add(s.id);
 }
 
 // Balayeur d'inactivité : évite les sessions/verrous fantômes si l'appelant a oublié stop.

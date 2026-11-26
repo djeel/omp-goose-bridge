@@ -66,6 +66,9 @@ export function routeTask(text: string): RouteDecision {
   if (RX_DEV.test(t))
     return { delegate: true, role: "developer", reason: "mot-clé mutation" };
   if (t.length > 400)
-    return { delegate: true, role: "developer", reason: "prompt long, délégation par défaut" };
+    // Long sans mot-clé de mutation : plan lecture seule plutôt que writer.
+    // Un spawn developer à froid coûte cher ; l'architecte peut demander
+    // la délégation écriture ensuite si besoin.
+    return { delegate: true, role: "architect", reason: "prompt long, plan lecture seule par défaut" };
   return { delegate: false, role: null, reason: "petit, Goose direct" };
 }
