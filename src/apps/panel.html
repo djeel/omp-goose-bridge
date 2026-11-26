@@ -20,7 +20,7 @@ button{border-radius:8px;padding:8px 12px;cursor:pointer;font-weight:600}
 body.dark button{background:#2a2a3a;color:#eee;border:1px solid #444}
 body.light button{background:#0071e3;color:#fff;border:1px solid #0071e3}
 button:hover{opacity:.85}
-pre{border-radius:8px;padding:10px;overflow:auto;max-height:300px;white-space:pre-wrap}
+pre{border-radius:8px;padding:10px;overflow:auto;max-height:320px;white-space:pre-wrap}
 body.dark pre{background:#0c0c10;border:1px solid #2a2a35}
 body.light pre{background:#f5f5f7;border:1px solid #ddd}
 input{width:100%;padding:8px;border-radius:8px}
@@ -28,6 +28,7 @@ body.dark input{background:#0e0e13;color:#eee;border:1px solid #333}
 body.light input{background:#fff;color:#1d1d1f;border:1px solid #ccc}
 .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;background:#244;color:#fff}
 h3{margin:0 0 8px;font-size:14px}
+.hint{font-size:12px;opacity:.65;margin-top:6px}
 </style>
 </head>
 <body class="dark">
@@ -39,19 +40,25 @@ h3{margin:0 0 8px;font-size:14px}
 <button id="bEvents">Événements</button>
 <button id="bSend">Envoyer au chat</button>
 </div></div>
-<div class="card"><h3>Workspace</h3><input id="ws" value="/home/djeel/Projets/murmur"></div>
+<div class="card">
+<h3>Workspace</h3>
+<input id="ws" placeholder="chemin du workspace (vide = défaut serveur)">
+<div class="hint">Doit être sous une racine autorisée (OMP_BRIDGE_ROOTS).</div>
+</div>
 <div class="card"><h3>Status</h3><pre id="out">Clique Refresh.</pre></div>
 <script>
 "use strict";
-// --- MCP App client (inline chat) : theme + resize + send-to-chat. Ignore si standalone.
+// --- Client MCP App (inline chat) : thème + resize + send-to-chat. Silencieux en standalone.
 class McpAppClient {
-  constructor(){this.seq=0;this.pending=new Map();this.theme=null;
+  constructor(){this.seq=0;this.pending=new Map();
     window.addEventListener("message",e=>this.onMsg(e));this.init();}
   async init(){try{
     const r=await this.req("ui/initialize",{});
-    if(r&&r.hostContext&&r.hostContext.theme)this.applyTheme(r.hostContext.theme);
+    const theme=r&&r.hostContext&&r.hostContext.theme;
+    if(theme)this.applyTheme(theme);
+    else this.applyTheme(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");
     this.notify("ui/notifications/initialized",{});this.size();
-  }catch(e){/* standalone : pas d'hote */}}
+  }catch(e){/* standalone : pas d'hôte */ this.applyTheme(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");}}
   onMsg(e){const d=e.data;if(!d||typeof d!=="object")return;
     if("id" in d&&this.pending.has(d.id)){const p=this.pending.get(d.id);
       this.pending.delete(d.id);d.error?p.reject(new Error(d.error.message)):p.resolve(d.result);return;}
@@ -62,30 +69,39 @@ class McpAppClient {
     window.parent.postMessage({jsonrpc:"2.0",id,method:m,params:p},"*");
     setTimeout(()=>{if(this.pending.has(id)){this.pending.delete(id);rej(new Error("timeout"));}},10000);});}
   notify(m,p){window.parent.postMessage({jsonrpc:"2.0",method:m,params:p},"*");}
-  applyTheme(t){document.body.className=(t==="light")?"light":"dark";this.theme=t;}
+  applyTheme(t){document.body.className=(t==="light")?"light":"dark";}
   size(){try{this.notify("ui/notifications/size-changed",{height:document.body.scrollHeight});}catch(e){}}
   send(text){return this.req("ui/message",{content:{type:"text",text}});}
 }
 const mcpApp=new McpAppClient();
+
+// Base HTTP : même origine si servie par serve.ts, sinon port configurable.
+function apiBase(){
+  if(location.protocol==="http:"||location.protocol==="https:")return location.origin;
+  const p=window.OMP_BRIDGE_HTTP||3210;
+  return "http://127.0.0.1:"+p;
+}
 async function api(tool,args){
-  const r=await fetch("http://127.0.0.1:3210/mcp/"+tool,{method:"POST",
+  const r=await fetch(apiBase()+"/mcp/"+tool,{method:"POST",
     headers:{"Content-Type":"application/json"},body:JSON.stringify(args||{})});
+  if(!r.ok)throw new Error("HTTP "+r.status+" : "+await r.text());
   return await r.text();
 }
-function ws(){return document.getElementById("ws").value;}
+function ws(){return document.getElementById("ws").value.trim();}
+function wsArg(){const w=ws();return w?{workspace:w}:{};}
 function ok(v){document.getElementById("conn").textContent=v?"Connected":"Offline";}
 function show(t){document.getElementById("out").textContent=t;mcpApp.size();}
 async function run(tool,args){
   try{show(await api(tool,args));ok(true);}
-  catch(e){show("Bridge HTTP off - lance : bun src/apps/serve.ts\n"+e);ok(false);}
+  catch(e){show("Panneau HTTP injoignable — lancer : bun src/apps/serve.ts\n"+e);ok(false);}
 }
-document.getElementById("bRefresh").onclick=()=>run("omp_dev_status",{workspace:ws()});
-document.getElementById("bDiff").onclick=()=>run("omp_get_diff",{workspace:ws()});
+document.getElementById("bRefresh").onclick=()=>run("omp_dev_status",wsArg());
+document.getElementById("bDiff").onclick=()=>run("omp_get_diff",wsArg());
 document.getElementById("bList").onclick=()=>run("omp_sessions_list",{});
 document.getElementById("bEvents").onclick=()=>run("omp_events_list",{});
 document.getElementById("bSend").onclick=async()=>{
   const t=document.getElementById("out").textContent;
-  try{await mcpApp.send("OMP Bridge — panneau :\n"+t);}catch(e){show("Envoi chat impossible (standalone).\n"+e);}
+  try{await mcpApp.send("OMP Bridge — panneau :\n"+t);}catch(e){show("Envoi chat impossible (mode standalone).\n"+e);}
 };
 </script>
 </body>

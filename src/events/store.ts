@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { dbPath, EVENTS_MAX } from "../config.js";
 
 export interface BridgeEvent {
   id?: number;
@@ -11,15 +12,14 @@ export interface BridgeEvent {
   data?: string;
 }
 
-const DB_PATH =
-  process.env.OMP_BRIDGE_DB ?? "/home/djeel/Projets/omp-goose-bridge/data/bridge.db";
-
 let db: Database | null = null;
+let inserts = 0;
 
 export function eventsDb(): Database {
   if (db) return db;
-  mkdirSync(dirname(DB_PATH), { recursive: true });
-  db = new Database(DB_PATH);
+  const path = dbPath();
+  mkdirSync(dirname(path), { recursive: true });
+  db = new Database(path);
   db.run(`CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ts TEXT NOT NULL,
@@ -36,17 +36,23 @@ export function eventsDb(): Database {
 export function eventAppend(e: Omit<BridgeEvent, "id" | "ts"> & { ts?: string }): number {
   const d = eventsDb();
   const r = d
-    .query(
-      `INSERT INTO events (ts, session_id, kind, summary, data) VALUES (?,?,?,?,?)`,
-    )
-    .run(
-      e.ts ?? new Date().toISOString(),
-      e.session_id,
-      e.kind,
-      e.summary,
-      e.data ?? null,
-    );
+    .query(`INSERT INTO events (ts, session_id, kind, summary, data) VALUES (?,?,?,?,?)`)
+    .run(e.ts ?? new Date().toISOString(), e.session_id, e.kind, e.summary, e.data ?? null);
+  // Rétention : purge périodique (tous les 200 inserts) pour éviter la croissance infinie.
+  if (++inserts % 200 === 0) pruneEvents(EVENTS_MAX);
   return Number(r.lastInsertRowid);
+}
+
+/** Conserve les `keep` événements les plus récents. Retourne le nombre supprimé. */
+export function pruneEvents(keep: number): number {
+  const d = eventsDb();
+  const row = d.query(`SELECT MIN(id) AS minId FROM (SELECT id FROM events ORDER BY id DESC LIMIT ?)`).get(keep) as
+    | { minId: number | null }
+    | undefined;
+  const minId = row?.minId;
+  if (minId == null || minId <= 1) return 0;
+  const r = d.query(`DELETE FROM events WHERE id < ?`).run(minId);
+  return Number(r.changes ?? 0);
 }
 
 export function eventList(opts: {
@@ -55,7 +61,7 @@ export function eventList(opts: {
   limit?: number;
 }): BridgeEvent[] {
   const d = eventsDb();
-  const limit = Math.min(opts.limit ?? 100, 500);
+  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
   if (opts.session_id && opts.kind) {
     return d
       .query(`SELECT * FROM events WHERE session_id=? AND kind=? ORDER BY id DESC LIMIT ?`)
@@ -74,7 +80,7 @@ export function eventList(opts: {
   return d.query(`SELECT * FROM events ORDER BY id DESC LIMIT ?`).all(limit) as BridgeEvent[];
 }
 
-// Résumé compact pour logs console + Event Router Phase 3.
+// Résumé compact pour logs console + Event Router.
 export function summarizeEvent(msg: any): string {
   const k = msg?.type ?? "?";
   if (k === "prompt_result")
@@ -87,4 +93,13 @@ export function summarizeEvent(msg: any): string {
   if (k === "message_update")
     return `message_update ${(msg?.message?.text ?? msg?.text ?? "").slice(0, 120)}`;
   return `${k}`;
+}
+
+/** Test-only : ferme la base et réinitialise le singleton. */
+export function _resetDbForTests(): void {
+  try {
+    db?.close();
+  } catch {}
+  db = null;
+  inserts = 0;
 }

@@ -13,11 +13,13 @@ import {
   sessionNewTurn,
   sessionResume,
   sessionStop,
+  sessionStopAll,
 } from "../core/session-manager.js";
 import { devStatusMarkdown } from "../core/status.js";
 import { routeTask } from "../core/router.js";
 import { eventList, eventAppend } from "../events/store.js";
 import { safeWorkspace, writerHolder, rpcArgsForRole } from "../workspace/guard.js";
+import { DEFAULT_WORKSPACE, HTTP_PORT } from "../config.js";
 
 // Pilotage OMP en RPC : Goose -> MCP -> 1 process RPC par session.
 // AUTORITE UNIQUE : seul developer mute. Tout le reste est read-only process.
@@ -28,7 +30,7 @@ import { safeWorkspace, writerHolder, rpcArgsForRole } from "../workspace/guard.
 const PANEL_URI = "ui://omp-bridge/dev-panel";
 
 const server = new McpServer(
-  { name: "omp-bridge", version: "0.1.0" },
+  { name: "omp-bridge", version: "1.0.0" },
   {
     capabilities: { resources: {} },
     instructions:
@@ -48,7 +50,7 @@ function panelHtml(): string {
 
 const PANEL_UI_META = {
   ui: {
-    csp: { connectDomains: ["http://127.0.0.1:3210"] },
+    csp: { connectDomains: [`http://127.0.0.1:${HTTP_PORT}`] },
     prefersBorder: true,
   },
 };
@@ -74,7 +76,7 @@ server.registerResource(
   })
 );
 let rpc: OmpRpc | null = null;
-let workspace: string = process.env.OMP_BRIDGE_WORKSPACE ?? "/tmp";
+let workspace: string = DEFAULT_WORKSPACE;
 
 function ws(): string {
   return safeWorkspace(workspace);
@@ -203,27 +205,28 @@ server.tool(
       ? { delegate: true, role: force_role as Role, reason: "force_role=" + force_role }
       : routeTask(task);
     eventAppend({ session_id: "auto", kind: "bridge_route", summary: "route delegate=" + dec.delegate + " role=" + dec.role + " (" + dec.reason + ")" });
-    if (!dec.delegate) {
+    if (!dec.delegate || !dec.role) {
       return { content: [{ type: "text", text: "local : pas de delegation (" + dec.reason + "). Goose gere direct." }] };
     }
-    if (dec.role === "developer") {
+    const role: Role = dec.role;
+    if (role === "developer") {
       const holder = writerHolder(wsc);
       if (holder) return { content: [{ type: "text", text: "refuse : writer deja actif " + holder + " sur " + wsc }] };
     }
     const s = await sessionCreate({
       workspace: wsc,
       sessionDir: session_dir,
-      label: label ?? ("auto-" + dec.role),
-      role: dec.role,
+      label: label ?? ("auto-" + role),
+      role,
     });
-    const prompt = ROLE_SYSTEM[dec.role] + "\n\nTache : " + task;
+    const prompt = ROLE_SYSTEM[role] + "\n\nTache : " + task;
     try {
       const text = await s.rpc.promptAndWait(prompt);
       return {
-        content: [{ type: "text", text: "auto route=" + dec.role + " session=" + s.id + "\n" + String(text).slice(0, 11000) }],
+        content: [{ type: "text", text: "auto route=" + role + " session=" + s.id + "\n" + String(text).slice(0, 11000) }],
       };
     } catch (e: any) {
-      return { content: [{ type: "text", text: "auto route=" + dec.role + " session=" + s.id + " erreur: " + e.message }] };
+      return { content: [{ type: "text", text: "auto route=" + role + " session=" + s.id + " erreur: " + e.message }] };
     }
   }
 );
@@ -388,3 +391,22 @@ server.tool(
 const transport = new StdioServerTransport();
 await server.connect(transport);
 console.error("[omp-bridge] MCP up workspace=" + ws());
+
+// Arrêt propre : tue les process OMP (aucun orphelin), libère les verrous.
+let shuttingDown = false;
+async function shutdown(sig: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.error(`[omp-bridge] arrêt (${sig})`);
+  try {
+    await sessionStopAll();
+  } catch {}
+  try {
+    await rpc?.stop();
+  } catch {}
+  rpc = null;
+  process.exit(0);
+}
+process.on("SIGINT", () => void shutdown("SIGINT"));
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("beforeExit", () => void shutdown("beforeExit"));

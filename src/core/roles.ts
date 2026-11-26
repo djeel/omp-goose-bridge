@@ -1,4 +1,3 @@
-import { OmpRpc } from "../rpc/client.js";
 import { execSync } from "node:child_process";
 
 // Rôles Phase 3 : séparation lecture / écriture sur workspace partagé.
@@ -35,12 +34,13 @@ export function toolsFor(role: Role): string {
 
 export function gitDiff(cwd: string, statOnly = false): string {
   try {
-    const cmd = statOnly ? "git diff --stat" : "git diff --stat\n---\ngit diff";
-    // stat d'abord, diff complet ensuite si demandé
-    if (statOnly) return execSync("git diff --stat", { cwd, encoding: "utf8", timeout: 15000 }) || "(clean)";
+    if (statOnly) {
+      return execSync("git diff --stat", { cwd, encoding: "utf8", timeout: 15000 }) || "(clean)";
+    }
     const stat = execSync("git diff --stat", { cwd, encoding: "utf8", timeout: 15000 });
     const diff = execSync("git diff", { cwd, encoding: "utf8", timeout: 15000 });
-    return `${stat}\n---\n${diff.slice(0, 12000)}` || "(clean)";
+    const out = `${stat}\n---\n${diff.slice(0, 12000)}`;
+    return out.trim() ? out : "(clean)";
   } catch (e: any) {
     return `diff error: ${e.message}`;
   }

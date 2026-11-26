@@ -1,5 +1,5 @@
 import { OmpRpc } from "../rpc/client.js";
-import type { Role } from "../core/roles.js";
+import type { Role } from "./roles.js";
 import {
   rpcArgsForRole,
   safeWorkspace,

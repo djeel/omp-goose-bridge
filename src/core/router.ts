@@ -1,30 +1,64 @@
-import type { Role } from "../core/roles.js";
+import type { Role } from "./roles.js";
 
-// Routeur auto : decide seul si Goose doit deleguer a OMP et vers quel role.
-// Deterministe, sans LLM (rapide, auditable, testable).
+// Routeur auto : décide si Goose doit déléguer à OMP et vers quel rôle.
+// Déterministe, sans LLM (rapide, auditable, testable).
 
 const DEV = [
-  "edit", "write", "modifie", "cree", "implemente",
-  "refactor", "corrige", "fix", "ajoute", "supprime", "migre", "ecris",
-  "patch", "commit", "test", "build",
+  "edit", "write", "modifie", "modifier", "cree", "creer", "implemente",
+  "implementer", "refactor", "refactorise", "corrige", "corriger", "fix",
+  "ajoute", "ajouter", "supprime", "supprimer", "migre", "migrer", "ecris",
+  "ecrire", "patch", "commit", "test", "tester", "build",
 ];
-const ARCHI = ["architect", "plan", "conception", "structure", "dependan", "design", "schema"];
-const SEARCH = ["cherche", "documentation", "quelle lib", "compare", "exemple", "comment faire"];
-const REVIEW = ["relis", "review", "audit", "verdict", "gate", "bloquant", "diff"];
+const ARCHI = [
+  "architect", "architecture", "plan", "planifie", "planifier", "planification",
+  "conception", "concevoir", "structure", "dependance", "dependances", "design",
+  "schema",
+];
+const SEARCH = [
+  "cherche", "chercher", "documentation", "doc", "quelle lib", "compare",
+  "comparer", "exemple", "comment faire",
+];
+const REVIEW = [
+  "relis", "relire", "review", "audit", "audite", "auditer", "verdict", "gate",
+  "bloquant", "bloquants", "diff",
+];
 
 export interface RouteDecision {
   delegate: boolean;
-  role: Role;
+  role: Role | null;
   reason: string;
 }
 
+/** Normalise : minuscules + suppression des accents. */
+function normalizeText(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Matching par mot/expression entière : "edit" ne matche pas "editor". */
+function hasKeyword(text: string, keys: string[]): boolean {
+  return keys.some((k) =>
+    new RegExp(`(^|[^a-z0-9])${escapeRe(k)}([^a-z0-9]|$)`, "i").test(text),
+  );
+}
+
 export function routeTask(text: string): RouteDecision {
-  const t = text.toLowerCase();
-  const has = (ks: string[]) => ks.some((k) => t.includes(k));
-  if (has(REVIEW)) return { delegate: true, role: "reviewer", reason: "mot-cle review/audit" };
-  if (has(ARCHI)) return { delegate: true, role: "architect", reason: "mot-cle architecture/plan" };
-  if (has(SEARCH)) return { delegate: true, role: "researcher", reason: "mot-cle recherche/docs" };
-  if (has(DEV)) return { delegate: true, role: "developer", reason: "mot-cle mutation" };
-  if (t.length > 400) return { delegate: true, role: "developer", reason: "long prompt, delegation par defaut" };
-  return { delegate: false, role: "researcher", reason: "petit, Goose direct" };
+  const t = normalizeText(String(text ?? ""));
+  if (hasKeyword(t, REVIEW))
+    return { delegate: true, role: "reviewer", reason: "mot-clé review/audit" };
+  if (hasKeyword(t, ARCHI))
+    return { delegate: true, role: "architect", reason: "mot-clé architecture/plan" };
+  if (hasKeyword(t, SEARCH))
+    return { delegate: true, role: "researcher", reason: "mot-clé recherche/docs" };
+  if (hasKeyword(t, DEV))
+    return { delegate: true, role: "developer", reason: "mot-clé mutation" };
+  if (t.length > 400)
+    return { delegate: true, role: "developer", reason: "prompt long, délégation par défaut" };
+  return { delegate: false, role: null, reason: "petit, Goose direct" };
 }

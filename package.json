@@ -1,12 +1,45 @@
 {
   "name": "omp-goose-bridge",
-  "version": "0.1.0",
-  "description": "Goose orchestrateur + OMP moteur — Bridge RPC Phase 1",
+  "version": "1.0.0",
+  "description": "Bridge RPC entre Goose (orchestrateur) et OMP (moteur) — sessions, rôles read-only/writer, panneau MCP App",
   "type": "module",
+  "license": "MIT",
+  "author": "djeel",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/djeel/omp-goose-bridge.git"
+  },
+  "homepage": "https://github.com/djeel/omp-goose-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/djeel/omp-goose-bridge/issues"
+  },
+  "keywords": [
+    "goose",
+    "mcp",
+    "model-context-protocol",
+    "omp",
+    "ai-agent",
+    "rpc",
+    "mcp-app"
+  ],
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "files": [
+    "src",
+    "recipes",
+    "agents",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
+    "mcp": "bun src/mcp/server.ts",
+    "panel": "bun src/apps/serve.ts",
     "probe": "bun src/rpc/probe.ts",
-    "check": "bunx tsc --noEmit",
-    "mcp": "bun src/mcp/server.ts"
+    "check": "tsc --noEmit",
+    "test": "bun test",
+    "install:goose": "bash scripts/install.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0"
