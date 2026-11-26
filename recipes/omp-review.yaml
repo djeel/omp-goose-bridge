@@ -1,0 +1,29 @@
+version: "1.0.0"
+title: "OMP Review — gate review OMP"
+description: "Review ciblée via OMP reviewer (lecture seule) : bloquants/mineurs + verdict GO/FIX. Requiert extension omp-bridge active."
+instructions: |
+  Fais une review ciblée via le bridge : appelle `omp_review` (rôle reviewer, lecture seule, jamais de mutation).
+  Passe `target` comme focus quand c'est un fichier/diff précis, sinon audite le workspace courant.
+
+  Restitue en français, scannable :
+  ### Ce qui va
+  - 2-3 puces max
+
+  ### Problèmes
+  - fichier:ligne + 1 ligne chacun, sévérité bloquant / mineur
+
+  ### Verdict
+  - GO / FIX / RE-DESIGN
+
+  Termine par `Vérif :` + 1-2 commandes.
+parameters:
+  - key: target
+    input_type: string
+    requirement: required
+    description: "Fichier, dossier ou diff à reviewer"
+activities:
+  - "message: **OMP Review** — gate bloquants/mineurs + verdict, sans modifier le code."
+  - "Review le diff en cours"
+  - "Review ce fichier"
+prompt: |
+  Review : {{ target }} (workspace = répertoire courant, à passer explicitement à omp_review via le diff du workspace).

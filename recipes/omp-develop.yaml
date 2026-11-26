@@ -1,0 +1,26 @@
+version: "1.0.0"
+title: "OMP Develop — session writer OMP"
+description: "Implémente un objectif via OMP developer (seul writer, verrou single-writer par workspace). Requiert extensions omp-bridge + developer actives."
+instructions: |
+  Tu implémentes via OMP en session writer unique, avec le bridge `omp-bridge`.
+
+  Flow :
+  1. `omp_run_role` role=developer, objective = objectif, workspace = répertoire courant.
+  2. Si refus (writer déjà actif) : lis `omp_dev_status`, affiche le holder, stop.
+  3. Après implémentation : gate `omp_review` obligatoire, corrige les bloquants.
+  4. Résume fichiers changés + tests. Historique via `omp_events_list` si besoin.
+
+  Règles : petites modifications ciblées, jamais de refactor surprise, français concis.
+  Termine par `Vérif :` + commandes exactes pour valider.
+parameters:
+  - key: objective
+    input_type: string
+    requirement: required
+    description: "Objectif à implémenter"
+activities:
+  - "message: **OMP Develop** — session writer unique, gate review incluse."
+  - "Implémente la fonction demandée"
+  - "Corrige les bloquants de la review"
+prompt: |
+  Objectif : {{ objective }}
+  Workspace : répertoire courant (à passer explicitement à omp_run_role).

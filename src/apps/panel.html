@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>OMP Bridge — panneau dev</title>
+<script type="application/ld+json">
+{"@context":"urn:goose.ai:schema","@type":"GooseApp","name":"omp-dev-panel","description":"Panneau OMP Bridge : sessions, branche, diff, writer","width":900,"height":640,"resizable":true}
+</script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:14px system-ui;padding:16px;min-height:100vh}
+body.dark{background:#101014;color:#e8e3f0}
+body.light{background:#f5f5f7;color:#1d1d1f}
+h1{font-size:18px;margin:0 0 12px}
+.card{border-radius:10px;padding:12px;margin-bottom:12px}
+body.dark .card{background:#1a1a22;border:1px solid #2c2c3a}
+body.light .card{background:#fff;border:1px solid #ddd;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button{border-radius:8px;padding:8px 12px;cursor:pointer;font-weight:600}
+body.dark button{background:#2a2a3a;color:#eee;border:1px solid #444}
+body.light button{background:#0071e3;color:#fff;border:1px solid #0071e3}
+button:hover{opacity:.85}
+pre{border-radius:8px;padding:10px;overflow:auto;max-height:300px;white-space:pre-wrap}
+body.dark pre{background:#0c0c10;border:1px solid #2a2a35}
+body.light pre{background:#f5f5f7;border:1px solid #ddd}
+input{width:100%;padding:8px;border-radius:8px}
+body.dark input{background:#0e0e13;color:#eee;border:1px solid #333}
+body.light input{background:#fff;color:#1d1d1f;border:1px solid #ccc}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;background:#244;color:#fff}
+h3{margin:0 0 8px;font-size:14px}
+</style>
+</head>
+<body class="dark">
+<h1>OMP Bridge <span class="badge" id="conn">Offline</span></h1>
+<div class="card"><div class="row">
+<button id="bRefresh">Refresh</button>
+<button id="bDiff">Diff</button>
+<button id="bList">Sessions</button>
+<button id="bEvents">Événements</button>
+<button id="bSend">Envoyer au chat</button>
+</div></div>
+<div class="card"><h3>Workspace</h3><input id="ws" value="/home/djeel/Projets/murmur"></div>
+<div class="card"><h3>Status</h3><pre id="out">Clique Refresh.</pre></div>
+<script>
+"use strict";
+// --- MCP App client (inline chat) : theme + resize + send-to-chat. Ignore si standalone.
+class McpAppClient {
+  constructor(){this.seq=0;this.pending=new Map();this.theme=null;
+    window.addEventListener("message",e=>this.onMsg(e));this.init();}
+  async init(){try{
+    const r=await this.req("ui/initialize",{});
+    if(r&&r.hostContext&&r.hostContext.theme)this.applyTheme(r.hostContext.theme);
+    this.notify("ui/notifications/initialized",{});this.size();
+  }catch(e){/* standalone : pas d'hote */}}
+  onMsg(e){const d=e.data;if(!d||typeof d!=="object")return;
+    if("id" in d&&this.pending.has(d.id)){const p=this.pending.get(d.id);
+      this.pending.delete(d.id);d.error?p.reject(new Error(d.error.message)):p.resolve(d.result);return;}
+    if(d.method==="ui/notifications/host-context-changed"&&d.params&&d.params.theme)
+      this.applyTheme(d.params.theme);}
+  req(m,p){return new Promise((res,rej)=>{const id=++this.seq;
+    this.pending.set(id,{resolve:res,reject:rej});
+    window.parent.postMessage({jsonrpc:"2.0",id,method:m,params:p},"*");
+    setTimeout(()=>{if(this.pending.has(id)){this.pending.delete(id);rej(new Error("timeout"));}},10000);});}
+  notify(m,p){window.parent.postMessage({jsonrpc:"2.0",method:m,params:p},"*");}
+  applyTheme(t){document.body.className=(t==="light")?"light":"dark";this.theme=t;}
+  size(){try{this.notify("ui/notifications/size-changed",{height:document.body.scrollHeight});}catch(e){}}
+  send(text){return this.req("ui/message",{content:{type:"text",text}});}
+}
+const mcpApp=new McpAppClient();
+async function api(tool,args){
+  const r=await fetch("http://127.0.0.1:3210/mcp/"+tool,{method:"POST",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify(args||{})});
+  return await r.text();
+}
+function ws(){return document.getElementById("ws").value;}
+function ok(v){document.getElementById("conn").textContent=v?"Connected":"Offline";}
+function show(t){document.getElementById("out").textContent=t;mcpApp.size();}
+async function run(tool,args){
+  try{show(await api(tool,args));ok(true);}
+  catch(e){show("Bridge HTTP off - lance : bun src/apps/serve.ts\n"+e);ok(false);}
+}
+document.getElementById("bRefresh").onclick=()=>run("omp_dev_status",{workspace:ws()});
+document.getElementById("bDiff").onclick=()=>run("omp_get_diff",{workspace:ws()});
+document.getElementById("bList").onclick=()=>run("omp_sessions_list",{});
+document.getElementById("bEvents").onclick=()=>run("omp_events_list",{});
+document.getElementById("bSend").onclick=async()=>{
+  const t=document.getElementById("out").textContent;
+  try{await mcpApp.send("OMP Bridge — panneau :\n"+t);}catch(e){show("Envoi chat impossible (standalone).\n"+e);}
+};
+</script>
+</body>
+</html>
