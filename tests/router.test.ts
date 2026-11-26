@@ -48,4 +48,17 @@ describe("routeTask", () => {
   test("raison toujours fournie", () => {
     expect(routeTask("bonjour").reason.length).toBeGreaterThan(0);
   });
+
+  test("entrée vide ou non-string ne casse pas", () => {
+    expect(routeTask("").delegate).toBe(false);
+    expect(routeTask(undefined as any).delegate).toBe(false);
+  });
+
+  test("review prioritaire sur mutation", () => {
+    expect(routeTask("audite ce fix et corrige le diff").role).toBe("reviewer");
+  });
+
+  test("recherche prioritaire sur mutation", () => {
+    expect(routeTask("cherche un exemple pour corriger ce bug").role).toBe("researcher");
+  });
 });

@@ -20,6 +20,10 @@ export function eventsDb(): Database {
   const path = dbPath();
   mkdirSync(dirname(path), { recursive: true });
   db = new Database(path);
+  // Perf + concurrence : WAL, writes non bloquants, attente lock 5 s.
+  db.run("PRAGMA journal_mode = WAL");
+  db.run("PRAGMA synchronous = NORMAL");
+  db.run("PRAGMA busy_timeout = 5000");
   db.run(`CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ts TEXT NOT NULL,

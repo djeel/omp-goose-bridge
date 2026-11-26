@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -19,7 +20,8 @@ import { devStatusMarkdown } from "../core/status.js";
 import { routeTask } from "../core/router.js";
 import { eventList, eventAppend } from "../events/store.js";
 import { safeWorkspace, writerHolder, rpcArgsForRole } from "../workspace/guard.js";
-import { defaultWorkspace, HTTP_PORT } from "../config.js";
+import { HTTP_PORT, MAX_OUTPUT, OMP_BIN, SESSION_TTL_MS, dbPath, defaultWorkspace, workspaceRoots } from "../config.js";
+import pkg from "../../package.json";
 
 // Pilotage OMP en RPC : Goose -> MCP -> 1 process RPC par session.
 // AUTORITE UNIQUE : seul developer mute. Tout le reste est read-only process.
@@ -30,7 +32,7 @@ import { defaultWorkspace, HTTP_PORT } from "../config.js";
 const PANEL_URI = "ui://omp-bridge/dev-panel";
 
 const server = new McpServer(
-  { name: "omp-bridge", version: "1.0.0" },
+  { name: "omp-bridge", version: pkg.version },
   {
     capabilities: { resources: {} },
     instructions:
@@ -76,20 +78,31 @@ server.registerResource(
   })
 );
 let rpc: OmpRpc | null = null;
+let rpcStarting: Promise<OmpRpc> | null = null;
 let workspace: string = defaultWorkspace();
 
 function ws(): string {
   return safeWorkspace(workspace);
 }
 
+// Single-flight : deux appels concurrents ne doivent pas spawner deux process OMP.
 async function ensureRpc(): Promise<OmpRpc> {
   if (rpc) return rpc;
-  rpc = new OmpRpc();
-  rpc.setBridgeSessionId("default");
-  // AUTORITE UNIQUE : default = read-only (pas de edit/write/bash).
-  // Seul developer via session dediee peut muter.
-  await rpc.start({ cwd: ws(), extraArgs: rpcArgsForRole("reviewer") });
-  return rpc;
+  if (rpcStarting) return rpcStarting;
+  rpcStarting = (async () => {
+    const r = new OmpRpc();
+    r.setBridgeSessionId("default");
+    // AUTORITE UNIQUE : default = read-only (pas de edit/write/bash).
+    // Seul developer via session dediee peut muter.
+    await r.start({ cwd: ws(), extraArgs: rpcArgsForRole("reviewer") });
+    rpc = r;
+    return r;
+  })();
+  try {
+    return await rpcStarting;
+  } finally {
+    rpcStarting = null;
+  }
 }
 
 // --- Pilotage rapide (session default) ---
@@ -116,6 +129,29 @@ server.tool(
     content: [{ type: "text", text: "Panneau OMP Bridge affiché ci-dessus." }],
     _meta: { ui: { resourceUri: PANEL_URI } },
   })
+);
+
+server.tool(
+  "omp_health",
+  "Diagnostic : version, binaire OMP, workspace, racines, verrou writer, sessions, DB",
+  {},
+  async () => {
+    const info = {
+      ok: true,
+      name: "omp-bridge",
+      version: pkg.version,
+      workspace_default: defaultWorkspace(),
+      workspace_current: ws(),
+      workspace_roots: workspaceRoots(),
+      workspace_writer: writerHolder(ws()),
+      omp_bin: OMP_BIN,
+      db: dbPath(),
+      session_ttl_s: Math.round(SESSION_TTL_MS / 1000),
+      sessions: sessionList().length,
+      panel_url: `http://127.0.0.1:${HTTP_PORT}/`,
+    };
+    return { content: [{ type: "text", text: JSON.stringify(info, null, 1) }] };
+  }
 );
 
 server.tool("omp_status", "Etat session OMP (get_state RPC)", {}, async () => {
@@ -147,7 +183,7 @@ server.tool("omp_cancel", "Annule le run OMP en cours (abort RPC)", {}, async ()
 server.tool("omp_agents_list", "Liste les subagents OMP", {}, async () => {
   const r = await ensureRpc();
   const s: any = await r.getSubagents();
-  return { content: [{ type: "text", text: JSON.stringify(s?.data ?? s).slice(0, 4000) }] };
+  return { content: [{ type: "text", text: JSON.stringify(s?.data ?? s).slice(0, Math.min(4000, MAX_OUTPUT)) }] };
 });
 
 // --- Preuves / gate ---
@@ -159,7 +195,7 @@ server.tool(
   async ({ stat_only }) => {
     try {
       const out = gitDiff(ws(), stat_only ?? false);
-      return { content: [{ type: "text", text: out.slice(0, 12000) || "(clean)" }] };
+      return { content: [{ type: "text", text: out.slice(0, MAX_OUTPUT) || "(clean)" }] };
     } catch (e: any) {
       return { content: [{ type: "text", text: "diff error: " + e.message }] };
     }
@@ -172,7 +208,7 @@ server.tool(
   { focus: z.string().optional() },
   async ({ focus }) => {
     const wsc = ws();
-    const diff = gitDiff(wsc, false).slice(0, 10000);
+    const diff = gitDiff(wsc, false).slice(0, MAX_OUTPUT);
     const prompt =
       ROLE_SYSTEM.reviewer +
       "\n\n" +
@@ -185,7 +221,7 @@ server.tool(
     const s = await sessionCreate({ workspace: wsc, label: "review", role: "reviewer" });
     try {
       const text = await s.rpc.promptAndWait(prompt);
-      return { content: [{ type: "text", text: String(text).slice(0, 12000) }] };
+      return { content: [{ type: "text", text: String(text).slice(0, MAX_OUTPUT) }] };
     } catch (e: any) {
       return { content: [{ type: "text", text: "review erreur: " + e.message }] };
     } finally {
@@ -237,7 +273,7 @@ server.tool(
     try {
       const text = await s.rpc.promptAndWait(prompt);
       return {
-        content: [{ type: "text", text: "auto route=" + role + " session=" + s.id + "\n" + String(text).slice(0, 11000) }],
+        content: [{ type: "text", text: "auto route=" + role + " session=" + s.id + "\n" + String(text).slice(0, MAX_OUTPUT) }],
       };
     } catch (e: any) {
       return { content: [{ type: "text", text: "auto route=" + role + " session=" + s.id + " erreur: " + e.message }] };
@@ -285,7 +321,7 @@ server.tool(
     try {
       const text = await s.rpc.promptAndWait(prompt);
       return {
-        content: [{ type: "text", text: "session=" + s.id + " role=" + role + "\n" + String(text).slice(0, 11000) }],
+        content: [{ type: "text", text: "session=" + s.id + " role=" + role + "\n" + String(text).slice(0, MAX_OUTPUT) }],
       };
     } catch (e: any) {
       return { content: [{ type: "text", text: "session=" + s.id + " role=" + role + " erreur: " + e.message }] };
@@ -345,8 +381,12 @@ server.tool(
     session_path: z.string().optional(),
   },
   async ({ id, session_dir, session_path }) => {
-    const out = await sessionResume({ id, sessionDir: session_dir, sessionPath: session_path });
-    return { content: [{ type: "text", text: out.slice(0, 4000) }] };
+    try {
+      const out = await sessionResume({ id, sessionDir: session_dir, sessionPath: session_path });
+      return { content: [{ type: "text", text: out.slice(0, Math.min(4000, MAX_OUTPUT)) }] };
+    } catch (e: any) {
+      return { content: [{ type: "text", text: "resume impossible: " + e.message }] };
+    }
   }
 );
 
@@ -355,8 +395,12 @@ server.tool(
   "Nouveau tour session (new_session RPC, garde le process)",
   { id: z.string() },
   async ({ id }) => {
-    const r = await sessionNewTurn(id);
-    return { content: [{ type: "text", text: "new_session cancelled=" + r.cancelled }] };
+    try {
+      const r = await sessionNewTurn(id);
+      return { content: [{ type: "text", text: "new_session cancelled=" + r.cancelled }] };
+    } catch (e: any) {
+      return { content: [{ type: "text", text: "new_session impossible: " + e.message }] };
+    }
   }
 );
 
@@ -365,8 +409,12 @@ server.tool(
   "Arrete une session pilotee (abort + kill, libere le lock writer)",
   { id: z.string() },
   async ({ id }) => {
-    await sessionStop(id);
-    return { content: [{ type: "text", text: "stopped " + id }] };
+    try {
+      await sessionStop(id);
+      return { content: [{ type: "text", text: "stopped " + id }] };
+    } catch (e: any) {
+      return { content: [{ type: "text", text: "stop impossible: " + e.message }] };
+    }
   }
 );
 
@@ -375,7 +423,12 @@ server.tool(
   "Envoie un prompt sur une session pilotee (refuse si role read-only : seul developer mute)",
   { id: z.string(), message: z.string() },
   async ({ id, message }) => {
-    const s = sessionGet(id);
+    let s;
+    try {
+      s = sessionGet(id);
+    } catch (e: any) {
+      return { content: [{ type: "text", text: e.message }] };
+    }
     if (s.role !== "developer") {
       return {
         content: [
@@ -386,8 +439,12 @@ server.tool(
         ],
       };
     }
-    const text = await s.rpc.promptAndWait(message);
-    return { content: [{ type: "text", text: String(text).slice(0, 12000) }] };
+    try {
+      const text = await s.rpc.promptAndWait(message);
+      return { content: [{ type: "text", text: String(text).slice(0, MAX_OUTPUT) }] };
+    } catch (e: any) {
+      return { content: [{ type: "text", text: "prompt impossible: " + e.message }] };
+    }
   }
 );
 
@@ -415,7 +472,7 @@ server.tool(
     const evts = eventList({ session_id, kind, limit: limit ?? 50 });
     if (!evts.length) return { content: [{ type: "text", text: "(aucun evenement)" }] };
     const txt = evts.map((e) => e.id + " [" + e.ts + "] " + e.session_id + " " + e.kind + " - " + e.summary).join("\n");
-    return { content: [{ type: "text", text: txt.slice(0, 12000) }] };
+    return { content: [{ type: "text", text: txt.slice(0, MAX_OUTPUT) }] };
   }
 );
 

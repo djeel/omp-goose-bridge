@@ -88,13 +88,15 @@ export function sessionList(): Array<{
   role: Role;
   createdAt: number;
 }> {
-  return [...sessions.values()].map((s) => ({
-    id: s.id,
-    workspace: s.workspace,
-    label: s.label,
-    role: s.role,
-    createdAt: s.createdAt,
-  }));
+  return [...sessions.values()]
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map((s) => ({
+      id: s.id,
+      workspace: s.workspace,
+      label: s.label,
+      role: s.role,
+      createdAt: s.createdAt,
+    }));
 }
 
 export async function sessionNewTurn(id: string): Promise<{ cancelled: boolean }> {

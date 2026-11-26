@@ -52,3 +52,10 @@ export const HTTP_HOST = process.env.OMP_BRIDGE_HTTP_HOST ?? "127.0.0.1";
 /** Rétention de l'historique (nombre max d'événements conservés). */
 export const EVENTS_MAX =
   Number(process.env.OMP_BRIDGE_EVENTS_MAX ?? 20000) || 20000;
+
+/** Timeout d'un prompt OMP (ms). */
+export const PROMPT_TIMEOUT_MS =
+  Number(process.env.OMP_BRIDGE_PROMPT_TIMEOUT ?? 300) * 1000;
+
+/** Taille max d'un texte renvoyé à Goose (caractères). */
+export const MAX_OUTPUT = Number(process.env.OMP_BRIDGE_MAX_OUTPUT ?? 12000) || 12000;

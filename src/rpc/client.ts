@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import { eventAppend, summarizeEvent } from "../events/store.js";
-import { OMP_BIN } from "../config.js";
+import { OMP_BIN, PROMPT_TIMEOUT_MS } from "../config.js";
 
 // Client RPC OMP : 1 process = 1 session vivante (--mode rpc --no-ui).
 // IMPORTANT : stdout est réservé au protocole MCP côté serveur ; ici, tous les
@@ -108,7 +108,11 @@ export class OmpRpc {
           p.reject(err);
         }
         this.pending.clear();
-        this.resultWaiters.clear();
+        // Rejette aussi les attentes de prompt : sinon un crash laisse pendre 300 s.
+        for (const [id, w] of this.resultWaiters) {
+          this.resultWaiters.delete(id);
+          w.reject(err);
+        }
         this.proc = null;
         if (!ready) reject(err);
       });
@@ -217,7 +221,7 @@ export class OmpRpc {
   }
 
   /** Envoie un prompt et attend le prompt_result (waiter enregistré AVANT l'envoi). */
-  async promptAndWait(message: string, timeoutMs = 300_000): Promise<string> {
+  async promptAndWait(message: string, timeoutMs = PROMPT_TIMEOUT_MS): Promise<string> {
     this.lastText = "";
     const id = `p${++this.promptSeq}`;
     const resultP = new Promise<any>((resolve, reject) => {

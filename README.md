@@ -2,7 +2,9 @@
 
 Bridge **MCP** qui donne à [Goose](https://block.github.io/goose/) un moteur d'exécution externe (**OMP**) piloté en **RPC**, avec une règle dure : **un seul writer par workspace**.
 
-Goose orchestre et décide ; OMP exécute dans des sessions isolées. Le bridge expose 18 outils MCP, un panneau de suivi (MCP App inline + page web locale), des recipes, des agents et des slash commands.
+Goose orchestre et décide ; OMP exécute dans des sessions isolées. Le bridge expose 19 outils MCP, un panneau de suivi (MCP App inline + page web locale), des recipes, des agents et des slash commands.
+
+> **English TL;DR** — An MCP bridge that lets [Goose](https://block.github.io/goose/) delegate work to an external **OMP** engine over RPC, with a hard rule: **one writer per workspace** (read-only roles are enforced process-side). 19 MCP tools, inline MCP App panel, SQLite event log, recipes/agents, 41 tests, MIT. Full docs below are in French; see [`.env.example`](.env.example) for configuration.
 
 ```
 Goose (Desktop / CLI)
@@ -77,10 +79,11 @@ bun run panel     # http://127.0.0.1:3210/ (bind localhost uniquement)
 
 Les outils nécessitant le process OMP (`omp_auto`, `omp_review`, `omp_run_role`, `omp_session_prompt`) restent côté MCP.
 
-## Outils MCP (18)
+## Outils MCP (19)
 
 **Pilotage** : `omp_delegate`, `omp_status`, `omp_steer`, `omp_cancel`, `omp_agents_list`
 **Preuves** : `omp_get_diff`, `omp_review`, `omp_dev_status`, `omp_events_list`, `omp_dev_panel`
+**Diagnostic** : `omp_health` (version, binaire OMP, racines, verrou, sessions, DB)
 **Routage** : `omp_auto` (décide seul : petit → Goose direct, sinon rôle OMP)
 **Sessions** : `omp_run_role`, `omp_session_create|list|resume|new|stop|prompt`
 
@@ -112,8 +115,26 @@ Tout est optionnel — voir [`.env.example`](.env.example).
 | `OMP_BRIDGE_DB` | `<repo>/data/bridge.db` | historique SQLite |
 | `OMP_BRIDGE_HTTP` / `_HOST` | `3210` / `127.0.0.1` | panneau |
 | `OMP_BRIDGE_SESSION_TTL` | `1800` | arrêt auto des sessions inactives (s) |
+| `OMP_BRIDGE_PROMPT_TIMEOUT` | `300` | timeout d'un prompt (s) |
+| `OMP_BRIDGE_MAX_OUTPUT` | `12000` | taille max d'une réponse (caractères) |
 | `OMP_BRIDGE_EVENTS_MAX` | `20000` | rétention |
 | `OMP_BRIDGE_VERBOSE` | `0` | logs stderr |
+
+## Diagnostic & dépannage
+
+```bash
+curl -s http://127.0.0.1:3210/healthz | jq     # état complet (version, OMP, racines, sessions)
+bun run probe                                  # handshake RPC réel
+```
+
+| Symptôme | Cause probable | Fix |
+|---|---|---|
+| `binaire OMP introuvable: "omp"` | OMP absent du `PATH` | `export OMP_BIN=/chemin/omp` |
+| `workspace refusé: /x` | hors allowlist | ajouter `/x` à `OMP_BRIDGE_ROOTS` |
+| `writer deja actif <id>` | session developer vivante | `omp_session_stop` ou attendre le TTL |
+| panneau « injoignable » | serveur HTTP arrêté | `bun run panel` |
+| `EADDRINUSE` | port 3210 pris | `OMP_BRIDGE_HTTP=3211` |
+| MCP ne liste pas les outils | extension non activée | vérifier `enabled: true` puis redémarrer Goose |
 
 ## Sécurité
 

@@ -38,6 +38,7 @@ h3{margin:0 0 8px;font-size:14px}
 <button id="bDiff">Diff</button>
 <button id="bList">Sessions</button>
 <button id="bEvents">Événements</button>
+<button id="bHealth">Santé</button>
 <button id="bSend">Envoyer au chat</button>
 </div></div>
 <div class="card">
@@ -99,6 +100,10 @@ document.getElementById("bRefresh").onclick=()=>run("omp_dev_status",wsArg());
 document.getElementById("bDiff").onclick=()=>run("omp_get_diff",wsArg());
 document.getElementById("bList").onclick=()=>run("omp_sessions_list",{});
 document.getElementById("bEvents").onclick=()=>run("omp_events_list",{});
+document.getElementById("bHealth").onclick=async()=>{
+  try{const r=await fetch(apiBase()+"/healthz");show(JSON.stringify(await r.json(),null,1));ok(true);}
+  catch(e){show("Panneau HTTP injoignable — lancer : bun src/apps/serve.ts\n"+e);ok(false);}
+};
 document.getElementById("bSend").onclick=async()=>{
   const t=document.getElementById("out").textContent;
   try{await mcpApp.send("OMP Bridge — panneau :\n"+t);}catch(e){show("Envoi chat impossible (mode standalone).\n"+e);}
