@@ -4,9 +4,8 @@ import { symlinkSync, rmSync } from "node:fs";
 
 // Les racines autorisées sont lues au chargement du module : on fixe l'env avant l'import.
 process.env.OMP_BRIDGE_ROOTS = "/tmp:/home/test/work";
-const { safeWorkspace, tryAcquireWriter, releaseWriter, writerHolder, _resetLocksForTests } =
+const { safeWorkspace, tryAcquireWriter, releaseWriter, writerHolder, safeSessionPath, _resetLocksForTests } =
   await import("../src/workspace/guard.js");
-
 beforeEach(() => _resetLocksForTests());
 
 describe("safeWorkspace", () => {
@@ -75,5 +74,37 @@ describe("single-writer lock", () => {
     tryAcquireWriter(ws, "s1");
     releaseWriter(ws, "s2");
     expect(writerHolder(ws)).toBe("s1");
+  });
+});
+
+describe("safeSessionPath", () => {
+  test("accepte un chemin sous une racine autorisée", () => {
+    expect(safeSessionPath("/tmp/sessions/s1")).toBe("/tmp/sessions/s1");
+  });
+
+  test("accepte un chemin sous le dossier de sessions", () => {
+    const root = resolve(process.env.HOME ?? "/root", ".local", "share", "omp-bridge", "sessions");
+    expect(safeSessionPath(`${root}/abc.session`)).toBe(`${root}/abc.session`);
+  });
+
+  test("refuse un chemin hors périmètre", () => {
+    expect(() => safeSessionPath("/etc/passwd")).toThrow(/refusé/);
+  });
+
+  test("refuse un chemin vide", () => {
+    expect(() => safeSessionPath("")).toThrow(/vide/);
+  });
+
+  test("refuse l'évasion par symlink", () => {
+    const link = `/tmp/omp-bridge-sess-${process.pid}`;
+    try {
+      rmSync(link, { force: true });
+    } catch {}
+    symlinkSync("/etc", link);
+    try {
+      expect(() => safeSessionPath(`${link}/x.session`)).toThrow(/refusé/);
+    } finally {
+      rmSync(link, { force: true });
+    }
   });
 });

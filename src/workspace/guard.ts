@@ -1,7 +1,8 @@
 import { toolsFor, type Role } from "../core/roles.js";
 import { defaultWorkspace, workspaceRoots } from "../config.js";
 import { realpathSync } from "node:fs";
-import { resolve, sep } from "node:path";
+import { homedir } from "node:os";
+import { basename, dirname, join, resolve, sep } from "node:path";
 
 // WorkspaceGuard : allowlist de racines + single-writer par workspace.
 // - developer = seul writer, un seul à la fois par workspace
@@ -12,13 +13,38 @@ function inside(root: string, path: string): boolean {
   return path.startsWith(root.endsWith(sep) ? root : root + sep);
 }
 
-/** Résout les symlinks quand le chemin existe (empêche l'évasion /tmp/lien -> /etc). */
+/**
+ * Résout les symlinks du plus long préfixe existant, puis ré-applique le reste.
+ * Nécessaire car realpathSync échoue sur un chemin inexistant : /tmp/lien/x
+ * (où /tmp/lien -> /etc) ne doit pas être accepté tel quel.
+ */
 function realish(p: string): string {
-  try {
-    return realpathSync(p);
-  } catch {
-    return p;
+  const abs = resolve(p);
+  let cur = abs;
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      const real = realpathSync(cur);
+      return tail.length ? join(real, ...tail.reverse()) : real;
+    } catch {
+      const parent = dirname(cur);
+      if (parent === cur) return abs; // racine inaccessible : on garde le chemin normalisé
+      tail.push(basename(cur));
+      cur = parent;
+    }
   }
+}
+
+// Les racines sont stables pendant la vie du process : on mémoïse leur realpath
+// (économie de 2-3 syscalls par validation, chemin chaud).
+const rootRealCache = new Map<string, string>();
+
+function rootReal(root: string): string {
+  const hit = rootRealCache.get(root);
+  if (hit) return hit;
+  const real = realish(root);
+  rootRealCache.set(root, real);
+  return real;
 }
 
 /** Valide et normalise un workspace (rejette hors allowlist). */
@@ -27,7 +53,7 @@ export function safeWorkspace(ws: unknown): string {
   if (!raw.trim()) throw new Error("workspace vide");
   const n = realish(resolve(raw)); // normalise + symlinks
   for (const root of workspaceRoots()) {
-    if (inside(realish(root), n)) return n;
+    if (inside(rootReal(root), n)) return n;
   }
   throw new Error(
     `workspace refusé: ${n} (autorisé: ${workspaceRoots().join(", ")})`,
@@ -61,6 +87,29 @@ export function writerHolder(workspace: string): string | null {
 export function rpcArgsForRole(role: Role): string[] {
   if (role === "developer") return [];
   return ["--no-tools", "--tools", toolsFor(role)];
+}
+
+/** Racine dédiée aux dossiers de session OMP. */
+export function sessionsRoot(): string {
+  return resolve(
+    process.env.OMP_BRIDGE_SESSIONS_DIR ??
+      join(homedir(), ".local", "share", "omp-bridge", "sessions"),
+  );
+}
+
+/**
+ * Valide un dossier/fichier de session : doit être sous une racine autorisée
+ * ou sous la racine de sessions. Empêche d'écrire/lire hors périmètre.
+ */
+export function safeSessionPath(p: unknown): string {
+  const raw = String(p ?? "");
+  if (!raw.trim()) throw new Error("chemin de session vide");
+  const n = realish(resolve(raw));
+  const roots = [...workspaceRoots(), sessionsRoot()];
+  for (const r of roots) {
+    if (inside(rootReal(r), n)) return n;
+  }
+  throw new Error(`chemin de session refusé: ${n} (autorisé: ${roots.join(", ")})`);
 }
 
 /** Test-only : remet les verrous à zéro. */

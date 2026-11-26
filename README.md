@@ -118,6 +118,8 @@ Tout est optionnel — voir [`.env.example`](.env.example).
 | `OMP_BRIDGE_PROMPT_TIMEOUT` | `300` | timeout d'un prompt (s) |
 | `OMP_BRIDGE_MAX_OUTPUT` | `12000` | taille max d'une réponse (caractères) |
 | `OMP_BRIDGE_EVENTS_MAX` | `20000` | rétention |
+| `OMP_BRIDGE_TOKEN` | *(vide)* | token du panneau HTTP (`x-omp-bridge-token`) |
+| `OMP_BRIDGE_SESSIONS_DIR` | `~/.local/share/omp-bridge/sessions` | reprise de session autorisée |
 | `OMP_BRIDGE_VERBOSE` | `0` | logs stderr |
 
 ## Diagnostic & dépannage
@@ -141,16 +143,27 @@ bun run probe                                  # handshake RPC réel
 - Allowlist de workspaces (`OMP_BRIDGE_ROOTS`) — rejet hors racines, y compris évasion par préfixe.
 - Écriture impossible hors session `developer`, verrou single-writer par workspace.
 - Panneau HTTP **bind 127.0.0.1** par défaut (jamais exposé au LAN).
-- Panneau : POST refusé si l'`Origin` n'est pas locale (anti-CSRF).
+- Panneau : POST refusé si l'`Origin` n'est pas locale (anti-CSRF) et token optionnel comparé à temps constant.
+- Résolution des symlinks sur le plus long préfixe existant (`/tmp/lien/x` → `/etc` refusé).
+- Chemins de session (`session_dir`/`session_path`) validés contre l'allowlist.
 - Aucun secret dans le repo ; stdout réservé au protocole MCP (logs sur stderr).
 
 ## Tests
 
 ```bash
+bun run ci        # typecheck + lint + tests (ce que fait la CI)
 bun run check     # tsc --noEmit
-bun test          # guard, router, events
+bun run lint      # biome lint .
+bun test          # 52 tests : guard, router, events, status, HTTP, client RPC (fake OMP)
+bun run bench     # micro-benchmarks des chemins chauds
 bun run probe     # handshake RPC réel avec OMP
 ```
+
+Le client RPC est testé sans binaire OMP via `tests/fixtures/fake-omp.ts`
+(handshake, prompt, abort, crash, binaire absent).
+
+Plus de détails : [ARCHITECTURE.md](ARCHITECTURE.md) · [CHANGELOG.md](CHANGELOG.md) ·
+exemples dans [`examples/`](examples).
 
 ## Licence
 

@@ -82,9 +82,15 @@ function apiBase(){
   const p=window.OMP_BRIDGE_HTTP||3210;
   return "http://127.0.0.1:"+p;
 }
+const TOKEN=new URLSearchParams(location.search).get("token")||"";
+function headers(){
+  const h={"Content-Type":"application/json"};
+  if(TOKEN)h["x-omp-bridge-token"]=TOKEN;
+  return h;
+}
 async function api(tool,args){
   const r=await fetch(apiBase()+"/mcp/"+tool,{method:"POST",
-    headers:{"Content-Type":"application/json"},body:JSON.stringify(args||{})});
+    headers:headers(),body:JSON.stringify(args||{})});
   if(!r.ok)throw new Error("HTTP "+r.status+" : "+await r.text());
   return await r.text();
 }

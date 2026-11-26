@@ -6,9 +6,10 @@ import {
   HTTP_HOST,
   HTTP_PORT,
   MAX_OUTPUT,
-  OMP_BIN,
+  ompBin,
   dbPath,
   defaultWorkspace,
+  httpToken,
   workspaceRoots,
 } from "../config.js";
 import { safeWorkspace, writerHolder } from "../workspace/guard.js";
@@ -45,6 +46,25 @@ function pickWorkspace(body: any): string {
   );
 }
 
+/** Comparaison à temps constant (évite les timings attacks sur le token). */
+function safeEqual(a: string, b: string): boolean {
+  const len = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
+/** Token optionnel : si OMP_BRIDGE_TOKEN est défini, il est requis sur les POST. */
+function authorized(req: Request, url: URL): boolean {
+  const token = httpToken();
+  if (!token) return true;
+  const given =
+    req.headers.get("x-omp-bridge-token") ?? url.searchParams.get("token") ?? "";
+  return safeEqual(given, token);
+}
+
 /** Anti-CSRF : refuse les POST venant d'une origine web non locale. */
 function originAllowed(req: Request): boolean {
   const origin = req.headers.get("origin");
@@ -67,7 +87,15 @@ function panelResponse(): Response {
     if (!panelCache || panelCache.mtimeMs !== st.mtimeMs) {
       panelCache = { mtimeMs: st.mtimeMs, body: readFileSync(p, "utf8") };
     }
-    return txt(panelCache.body, 200, "text/html; charset=utf-8");
+    return new Response(panelCache.body, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Security-Policy":
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* http://localhost:*; img-src 'self' data:; frame-ancestors 'none'",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
+    },
+  });
   } catch {
     return txt("panel.html manquant", 500);
   }
@@ -87,7 +115,7 @@ function health() {
     workspace_default: defaultWorkspace(),
     workspace_roots: workspaceRoots(),
     workspace_writer: writerHolder(defaultWorkspace()),
-    omp_bin: OMP_BIN,
+    omp_bin: ompBin(),
     db,
     sessions: sessionList().length,
     events: eventList({ limit: 1 }).length > 0,
@@ -115,6 +143,7 @@ export function createPanelServer(opts: { port?: number; hostname?: string } = {
 
     if (req.method === "POST" && url.pathname.startsWith("/mcp/")) {
       if (!originAllowed(req)) return txt("origine refusée", 403);
+      if (!authorized(req, url)) return txt("token requis", 401);
       const tool = url.pathname.slice("/mcp/".length);
       let body: any = {};
       try {
@@ -165,5 +194,24 @@ export function createPanelServer(opts: { port?: number; hostname?: string } = {
 // Démarre uniquement en exécution directe (pas à l'import dans les tests).
 const server = import.meta.main ? createPanelServer() : null;
 if (server) console.error(`[omp-bridge] http http://${server.hostname}:${server.port}/`);
+
+// Une erreur non gérée laisse le service dans un état inconnu : on log et on sort,
+// systemd (Restart=always) relance proprement.
+if (server) {
+  process.on("uncaughtException", (e) => {
+    console.error("[omp-bridge-http] uncaughtException:", e?.stack ?? e);
+    process.exit(1);
+  });
+  process.on("unhandledRejection", (e: any) => {
+    console.error("[omp-bridge-http] unhandledRejection:", e?.stack ?? e);
+    process.exit(1);
+  });
+  process.on("SIGTERM", () => {
+    void server.stop(true).finally(() => process.exit(0));
+  });
+  process.on("SIGINT", () => {
+    void server.stop(true).finally(() => process.exit(0));
+  });
+}
 
 export { server, health };

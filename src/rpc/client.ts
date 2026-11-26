@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import { eventAppend, summarizeEvent } from "../events/store.js";
-import { OMP_BIN, PROMPT_TIMEOUT_MS } from "../config.js";
+import { ompBin, PROMPT_TIMEOUT_MS } from "../config.js";
 
 // Client RPC OMP : 1 process = 1 session vivante (--mode rpc --no-ui).
 // IMPORTANT : stdout est réservé au protocole MCP côté serveur ; ici, tous les
@@ -56,7 +56,8 @@ export class OmpRpc {
     const args = ["--mode", "rpc", "--no-ui", "--no-session", ...(opts.extraArgs ?? [])];
     if (opts.sessionDir) args.push("--session-dir", opts.sessionDir);
 
-    const proc = spawn(OMP_BIN, args, {
+    const bin = ompBin();
+    const proc = spawn(bin, args, {
       cwd: opts.cwd,
       stdio: ["pipe", "pipe", "pipe"],
       env: process.env,
@@ -73,7 +74,7 @@ export class OmpRpc {
         reject(
           new Error(
             e.code === "ENOENT"
-              ? `binaire OMP introuvable: "${OMP_BIN}". Installe-le ou définis OMP_BIN.`
+              ? `binaire OMP introuvable: "${bin}". Installe-le ou définis OMP_BIN.`
               : `échec lancement OMP: ${e.message}`,
           ),
         );

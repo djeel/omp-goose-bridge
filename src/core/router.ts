@@ -41,22 +41,29 @@ function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Matching par mot/expression entière : "edit" ne matche pas "editor". */
-function hasKeyword(text: string, keys: string[]): boolean {
-  return keys.some((k) =>
-    new RegExp(`(^|[^a-z0-9])${escapeRe(k)}([^a-z0-9]|$)`, "i").test(text),
-  );
+/**
+ * Compile une catégorie en UNE regex (bornes de mot partagées) : "edit" ne
+ * matche pas "editor", et on évite de construire N regex par appel.
+ */
+function compile(keys: string[]): RegExp {
+  const alt = keys.map(escapeRe).join("|");
+  return new RegExp(`(?:^|[^a-z0-9])(?:${alt})(?:[^a-z0-9]|$)`, "i");
 }
+
+const RX_REVIEW = compile(REVIEW);
+const RX_ARCHI = compile(ARCHI);
+const RX_SEARCH = compile(SEARCH);
+const RX_DEV = compile(DEV);
 
 export function routeTask(text: string): RouteDecision {
   const t = normalizeText(String(text ?? ""));
-  if (hasKeyword(t, REVIEW))
+  if (RX_REVIEW.test(t))
     return { delegate: true, role: "reviewer", reason: "mot-clé review/audit" };
-  if (hasKeyword(t, ARCHI))
+  if (RX_ARCHI.test(t))
     return { delegate: true, role: "architect", reason: "mot-clé architecture/plan" };
-  if (hasKeyword(t, SEARCH))
+  if (RX_SEARCH.test(t))
     return { delegate: true, role: "researcher", reason: "mot-clé recherche/docs" };
-  if (hasKeyword(t, DEV))
+  if (RX_DEV.test(t))
     return { delegate: true, role: "developer", reason: "mot-clé mutation" };
   if (t.length > 400)
     return { delegate: true, role: "developer", reason: "prompt long, délégation par défaut" };

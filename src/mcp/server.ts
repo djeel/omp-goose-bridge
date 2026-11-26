@@ -19,8 +19,21 @@ import {
 import { devStatusMarkdown } from "../core/status.js";
 import { routeTask } from "../core/router.js";
 import { eventList, eventAppend } from "../events/store.js";
-import { safeWorkspace, writerHolder, rpcArgsForRole } from "../workspace/guard.js";
-import { HTTP_PORT, MAX_OUTPUT, OMP_BIN, SESSION_TTL_MS, dbPath, defaultWorkspace, workspaceRoots } from "../config.js";
+import {
+  rpcArgsForRole,
+  safeSessionPath,
+  safeWorkspace,
+  writerHolder,
+} from "../workspace/guard.js";
+import {
+  HTTP_PORT,
+  MAX_OUTPUT,
+  SESSION_TTL_MS,
+  dbPath,
+  defaultWorkspace,
+  ompBin,
+  workspaceRoots,
+} from "../config.js";
 import pkg from "../../package.json";
 
 // Pilotage OMP en RPC : Goose -> MCP -> 1 process RPC par session.
@@ -144,7 +157,7 @@ server.tool(
       workspace_current: ws(),
       workspace_roots: workspaceRoots(),
       workspace_writer: writerHolder(ws()),
-      omp_bin: OMP_BIN,
+      omp_bin: ompBin(),
       db: dbPath(),
       session_ttl_s: Math.round(SESSION_TTL_MS / 1000),
       sessions: sessionList().length,
@@ -265,7 +278,7 @@ server.tool(
     }
     const s = await sessionCreate({
       workspace: wsc,
-      sessionDir: session_dir,
+      sessionDir: session_dir ? safeSessionPath(session_dir) : undefined,
       label: label ?? ("auto-" + role),
       role,
     });
@@ -313,7 +326,7 @@ server.tool(
     }
     const s = await sessionCreate({
       workspace: wsc,
-      sessionDir: session_dir,
+      sessionDir: session_dir ? safeSessionPath(session_dir) : undefined,
       label: label ?? role,
       role: role as Role,
     });
@@ -349,7 +362,7 @@ server.tool(
     workspace = wsc;
     const s = await sessionCreate({
       workspace: wsc,
-      sessionDir: session_dir,
+      sessionDir: session_dir ? safeSessionPath(session_dir) : undefined,
       label,
       role: (role as Role) ?? "developer",
     });
@@ -382,7 +395,11 @@ server.tool(
   },
   async ({ id, session_dir, session_path }) => {
     try {
-      const out = await sessionResume({ id, sessionDir: session_dir, sessionPath: session_path });
+      const out = await sessionResume({
+        id,
+        sessionDir: session_dir ? safeSessionPath(session_dir) : undefined,
+        sessionPath: session_path ? safeSessionPath(session_path) : undefined,
+      });
       return { content: [{ type: "text", text: out.slice(0, Math.min(4000, MAX_OUTPUT)) }] };
     } catch (e: any) {
       return { content: [{ type: "text", text: "resume impossible: " + e.message }] };
@@ -423,7 +440,7 @@ server.tool(
   "Envoie un prompt sur une session pilotee (refuse si role read-only : seul developer mute)",
   { id: z.string(), message: z.string() },
   async ({ id, message }) => {
-    let s;
+    let s: ReturnType<typeof sessionGet>;
     try {
       s = sessionGet(id);
     } catch (e: any) {
@@ -498,3 +515,14 @@ async function shutdown(sig: string) {
 process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("beforeExit", () => void shutdown("beforeExit"));
+
+// Filet de sécurité : une erreur non gérée laisserait le protocole stdio
+// dans un état inconnu (Goose attendrait indéfiniment). On sort proprement.
+process.on("uncaughtException", (e) => {
+  console.error("[omp-bridge] uncaughtException:", e?.stack ?? e);
+  void shutdown("uncaughtException");
+});
+process.on("unhandledRejection", (e: any) => {
+  console.error("[omp-bridge] unhandledRejection:", e?.stack ?? e);
+  void shutdown("unhandledRejection");
+});

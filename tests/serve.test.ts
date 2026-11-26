@@ -86,6 +86,28 @@ describe("panneau HTTP", () => {
     expect(r.status).toBe(404);
   });
 
+  test("token requis quand OMP_BRIDGE_TOKEN est défini", async () => {
+    process.env.OMP_BRIDGE_TOKEN = "s3cret";
+    try {
+      const sans = await fetch(`${base}/mcp/omp_dev_status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspace: "/tmp" }),
+      });
+      expect(sans.status).toBe(401);
+      expect(await sans.text()).toContain("token");
+
+      const avec = await fetch(`${base}/mcp/omp_dev_status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-omp-bridge-token": "s3cret" },
+        body: JSON.stringify({ workspace: "/tmp" }),
+      });
+      expect(avec.status).toBe(200);
+    } finally {
+      delete process.env.OMP_BRIDGE_TOKEN;
+    }
+  });
+
   test("omp_dev_status_json renvoie du JSON structuré", async () => {
     const r = await fetch(`${base}/mcp/omp_dev_status_json`, {
       method: "POST",

@@ -1,0 +1,18 @@
+# Extension MCP omp-bridge — à fusionner dans ~/.config/goose/config.yaml
+extensions:
+  omp-bridge:
+    enabled: true
+    type: stdio
+    name: omp-bridge
+    cmd: bun
+    args: ["/chemin/vers/omp-goose-bridge/src/mcp/server.ts"]
+    timeout: 300
+    envs:
+      OMP_BIN: /usr/local/bin/omp
+      OMP_BRIDGE_WORKSPACE: /home/moi/projets
+      OMP_BRIDGE_ROOTS: /home/moi/projets:/tmp
+      # OMP_BRIDGE_TOKEN: change-moi   # protège le panneau HTTP
+
+# Goose Desktop (Flatpak) : lancer bun côté hôte
+#   cmd: flatpak-spawn
+#   args: ["--host", "bun", "/chemin/vers/src/mcp/server.ts"]

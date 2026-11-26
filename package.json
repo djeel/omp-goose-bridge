@@ -1,6 +1,6 @@
 {
   "name": "omp-goose-bridge",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Bridge RPC entre Goose (orchestrateur) et OMP (moteur) — sessions, rôles read-only/writer, panneau MCP App",
   "type": "module",
   "license": "MIT",
@@ -30,6 +30,9 @@
     "recipes",
     "agents",
     "scripts",
+    "examples",
+    "CHANGELOG.md",
+    "ARCHITECTURE.md",
     "README.md",
     "LICENSE",
     "SECURITY.md",
@@ -40,13 +43,18 @@
     "panel": "bun src/apps/serve.ts",
     "probe": "bun src/rpc/probe.ts",
     "check": "tsc --noEmit",
+    "lint": "biome lint .",
+    "bench": "bun scripts/bench.ts",
     "test": "bun test",
-    "install:goose": "bash scripts/install.sh"
+    "ci": "tsc --noEmit && biome lint . && bun test",
+    "install:goose": "bash scripts/install.sh",
+    "prepublishOnly": "bun run ci"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.9",
     "@types/bun": "^1.4.5",
     "typescript": "^5.6.0"
   },

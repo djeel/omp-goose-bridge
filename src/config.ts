@@ -11,7 +11,7 @@ export const REPO_ROOT = resolve(HERE, "..");
 export function workspaceRoots(): string[] {
   const roots = new Set<string>();
   const raw = process.env.OMP_BRIDGE_ROOTS;
-  if (raw && raw.trim()) {
+  if (raw?.trim()) {
     for (const p of raw.split(":")) {
       const t = p.trim();
       if (t) roots.add(resolve(t));
@@ -22,17 +22,19 @@ export function workspaceRoots(): string[] {
   }
   // Le workspace par défaut est toujours autorisé.
   const def = process.env.OMP_BRIDGE_WORKSPACE;
-  if (def && def.trim()) roots.add(resolve(def));
+  if (def?.trim()) roots.add(resolve(def));
   return [...roots];
 }
 
-/** Binaire OMP (résolu via PATH par défaut). */
-export const OMP_BIN = process.env.OMP_BIN || "omp";
+/** Binaire OMP (résolu via PATH par défaut ; lu à chaque spawn pour être testable). */
+export function ompBin(): string {
+  return process.env.OMP_BIN || "omp";
+}
 
 /** Workspace par défaut quand l'appelant n'en fournit pas. */
 export function defaultWorkspace(): string {
   const env = process.env.OMP_BRIDGE_WORKSPACE;
-  if (env && env.trim()) return resolve(env);
+  if (env?.trim()) return resolve(env);
   return workspaceRoots()[0] ?? resolve(process.cwd());
 }
 
@@ -48,6 +50,11 @@ export function dbPath(): string {
 /** Serveur HTTP du panneau : bind localhost par défaut (jamais exposé au LAN). */
 export const HTTP_PORT = Number(process.env.OMP_BRIDGE_HTTP ?? 3210);
 export const HTTP_HOST = process.env.OMP_BRIDGE_HTTP_HOST ?? "127.0.0.1";
+
+/** Token optionnel : s'il est défini, les POST du panneau l'exigent. */
+export function httpToken(): string {
+  return process.env.OMP_BRIDGE_TOKEN || "";
+}
 
 /** Rétention de l'historique (nombre max d'événements conservés). */
 export const EVENTS_MAX =
