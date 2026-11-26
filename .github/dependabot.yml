@@ -1,6 +1,7 @@
 version: 2
 updates:
-  - package-ecosystem: npm
+  # Ce dépôt est géré par Bun (bun.lock) : l'écosystème npm_and_yarn est refusé par Dependabot.
+  - package-ecosystem: bun
     directory: "/"
     schedule:
       interval: weekly
