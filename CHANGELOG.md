@@ -12,6 +12,8 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) · [SemVer](ht
 - Tests `roles` (whitelist, `gitDiff` propre/hors-dépôt) et `pool` (réutilisation, isolation workspaces, refus developer).
 - Pool borné : cap 4 sessions au repos (`OMP_BRIDGE_POOL_MAX`), stop dès 300 s d'inactivité, rotation à 1800 s d'âge (`OMP_BRIDGE_POOL_ROTATE`), compteurs hit/miss exposés dans `omp_dev_status`.
 - `gitDiffParts` : stat + diff + troncature explicite ; `omp_review` construit un prompt budgété et impose **NEED-MORE** sur diff partiel (plus de GO aveugle).
+- `omp_health`/`healthz` exposent `omp_version` (`OMP_BIN --version`) + `omp_supported` (19.x testé : alerte, pas panne).
+- Rate-limit des POST du panneau sans token : `OMP_BRIDGE_HTTP_RATE` par IP/minute (429 au-delà, inactif si token défini).
 
 ### Corrigé
 - Prompt long sans mot-clé routé en `architect` (lecture seule) au lieu de `developer` : plus de spawn writer à froid par défaut.

@@ -31,9 +31,11 @@ import {
   HTTP_PORT,
   MAX_OUTPUT,
   SESSION_TTL_MS,
-  dbPath,
   defaultWorkspace,
   ompBin,
+  ompSupported,
+  ompVersion,
+  dbPath,
   workspaceRoots,
 } from "../config.js";
 import pkg from "../../package.json";
@@ -158,6 +160,7 @@ server.tool(
   "Diagnostic : version, binaire OMP, workspace, racines, verrou writer, sessions, DB",
   {},
   async () => {
+    const omp = ompVersion();
     const info = {
       ok: true,
       name: "omp-bridge",
@@ -167,6 +170,8 @@ server.tool(
       workspace_roots: workspaceRoots(),
       workspace_writer: writerHolder(ws()),
       omp_bin: ompBin(),
+      omp_version: omp,
+      omp_supported: ompSupported(omp),
       db: dbPath(),
       session_ttl_s: Math.round(SESSION_TTL_MS / 1000),
       sessions: sessionList().length,

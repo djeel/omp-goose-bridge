@@ -21,7 +21,7 @@ Goose (Desktop / CLI)               OMP Bridge                         OMP
 
 | Module | Rôle |
 |---|---|
-| `src/config.ts` | Toute la configuration par env, zéro chemin machine. Fonctions (pas constantes) pour rester testable dans un même process Bun. |
+| `src/config.ts` | Toute la configuration par env, zéro chemin machine. Fonctions (pas constantes) pour rester testable dans un même process Bun. `ompVersion()` (`--version`, cache process) + `ompSupported()` (19.x testé), `httpRatePerMin()`. |
 | `src/workspace/guard.ts` | Allowlist de racines (realpath du plus long préfixe existant), verrou single-writer **mémoire + fichier** (multi-processus : Goose CLI + Desktop), validation des chemins de session. |
 | `src/rpc/client.ts` | Client RPC OMP : handshake `ready` + `negotiate_protocol` v2, waiters par `id` enregistrés **avant** l'envoi, abort/exit qui rejettent proprement. Logs sur **stderr** uniquement (stdout = protocole MCP). |
 | `src/core/router.ts` | Routage déterministe sans LLM (review > archi > recherche > mutation), bornes de mot, accents normalisés, regex précompilées. DEV = verbes d'action d'écriture (pas "test"/"build" : diagnostic ≠ ordre). Prompt long sans mot-clé → `architect` (lecture seule, pas de spawn writer à froid). |
@@ -30,7 +30,7 @@ Goose (Desktop / CLI)               OMP Bridge                         OMP
 | `src/core/status.ts` | Diagnostic dev : `git status --porcelain=v2 --branch` en un appel, sessions, writer. |
 | `src/events/store.ts` | Journal SQLite (WAL, `synchronous=NORMAL`, `busy_timeout`), rétention par prune tous les 200 inserts. |
 | `src/mcp/server.ts` | Serveur MCP : 19 outils, ressource `ui://omp-bridge/dev-panel`, arrêt propre (SIGINT/SIGTERM/beforeExit/uncaught). |
-| `src/apps/serve.ts` | Panneau HTTP local : anti-CSRF (Origin), token à temps constant, CSP, endpoints JSON. |
+| `src/apps/serve.ts` | Panneau HTTP local : anti-CSRF (Origin), token à temps constant, rate-limit des POST sans token (429), CSP, endpoints JSON. `healthz`/`omp_health` exposent `omp_version` + `omp_supported`. |
 | `src/apps/panel.html` | Client MCP App (thème, resize, send-to-chat) avec fallback standalone. |
 
 ## Modèle d'autorité (invariant central)
@@ -57,5 +57,5 @@ routeTask(task) → role
 - **RPC plutôt que CLI par appel** : un process OMP par session, pas un cold start par prompt.
 - **Événements typés en SQLite** : auditable et requêtable, sans dépendance externe.
 - **Pas de `message_update` persisté** : un token = une ligne saturerait la base ; seul le résultat compte.
-- **Router sans LLM** : coût nul, comportement déterministe et testable (67 tests).
+- **Router sans LLM** : coût nul, comportement déterministe et testable (74 tests).
 - **MCP App natif** : le panneau est une ressource `ui://` rendue inline dans Goose, pas une iframe externe.
