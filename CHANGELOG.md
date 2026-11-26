@@ -10,11 +10,14 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) · [SemVer](ht
 - `researcher` reçoit `web_search`, `architect`/`reviewer` reçoivent `lsp` (toujours sans edit/write/bash/task).
 - `omp_dev_panel` annonce l'URL fallback locale quand le client ne rend pas les MCP Apps inline.
 - Tests `roles` (whitelist, `gitDiff` propre/hors-dépôt) et `pool` (réutilisation, isolation workspaces, refus developer).
+- Pool borné : cap 4 sessions au repos (`OMP_BRIDGE_POOL_MAX`), stop dès 300 s d'inactivité, rotation à 1800 s d'âge (`OMP_BRIDGE_POOL_ROTATE`), compteurs hit/miss exposés dans `omp_dev_status`.
+- `gitDiffParts` : stat + diff + troncature explicite ; `omp_review` construit un prompt budgété et impose **NEED-MORE** sur diff partiel (plus de GO aveugle).
 
 ### Corrigé
 - Prompt long sans mot-clé routé en `architect` (lecture seule) au lieu de `developer` : plus de spawn writer à froid par défaut.
+- Routeur : "test"/"tester"/"build" sortis de DEV — "ce test échoue, pourquoi ?" va en `architect` (diagnostic), "ajoute un test" reste `developer` via le verbe.
 - `gitDiff` en un seul spawn (stat + diff dans le même shell) ; dépôt propre retourne `(clean)` au lieu de `"---"`.
-- Comptes docs : 19 outils (plus 20), 62 tests (plus 41/52).
+- Comptes docs : 19 outils (plus 20), 67 tests (plus 41/52).
 
 ## [1.2.0] — 2026-11-26
 

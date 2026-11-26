@@ -1,4 +1,4 @@
-import { sessionList } from "./session-manager.js";
+import { sessionList, poolStats } from "./session-manager.js";
 import { execSync } from "node:child_process";
 
 export function sh(cwd: string, cmd: string): string {
@@ -57,6 +57,7 @@ export function devStatus(workspace: string) {
       age_s: Math.round((Date.now() - s.createdAt) / 1000),
     })),
     git: { stat },
+    pool: poolStats(),
     updatedAt: new Date().toISOString(),
   };
 }
@@ -78,6 +79,8 @@ export function devStatusMarkdown(workspace: string): string {
     ``,
     `Sessions (${d.sessions.length}) :`,
     sess,
+    ``,
+    `Pool read-only : ${d.pool.pooled} au repos — ${d.pool.hits} hits / ${d.pool.misses} misses`,
     ``,
     `Diff :`,
     "```",

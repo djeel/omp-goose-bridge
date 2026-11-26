@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 
-const { toolsFor, gitDiff } = await import("../src/core/roles.js");
+const { toolsFor, gitDiff, gitDiffParts, REVIEW_GATE } = await import("../src/core/roles.js");
 
 describe("toolsFor", () => {
   test("developer = seul writer complet", () => {
@@ -34,6 +34,27 @@ describe("toolsFor", () => {
 });
 
 describe("gitDiff", () => {
+  test("NEED-MORE devient le 4e verdict du gate", () => {
+    expect(REVIEW_GATE).toContain("NEED-MORE");
+  });
+
+  test("gros diff -> tronqué avec compteur de manquants", () => {
+    const dir = mkdtempSync(join(tmpdir(), "omp-bigdiff-"));
+    try {
+      execSync("git init -q && git commit -q --allow-empty -m init", { cwd: dir });
+      writeFileSync(join(dir, "big.txt"), "x".repeat(20000));
+      execSync("git add -N big.txt", { cwd: dir }); // intent-to-add : visible dans git diff sans stager
+      const parts = gitDiffParts(dir, 1000);
+      expect(parts.stat.length).toBeGreaterThan(0);
+      expect(parts.truncated).toBe(true);
+      expect(parts.missing).toBeGreaterThan(0);
+      expect(parts.diff.length).toBeLessThanOrEqual(1000);
+      expect(gitDiff(dir)).toContain("NEED-MORE");
+      expect(gitDiff(dir)).toContain("[DIFF TRONQUÉ");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
   test("dépôt propre -> (clean)", () => {
     const dir = mkdtempSync(join(tmpdir(), "omp-diff-"));
     try {

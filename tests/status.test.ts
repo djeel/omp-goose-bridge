@@ -40,6 +40,7 @@ describe("devStatus", () => {
     const md = devStatusMarkdown(repoRoot);
     expect(md).toContain("Workspace");
     expect(md).toContain("Sessions (");
+    expect(md).toContain("Pool read-only");
   });
 
   test("hors dépôt : mention explicite", () => {

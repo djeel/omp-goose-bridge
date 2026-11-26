@@ -3,11 +3,14 @@ import type { Role } from "./roles.js";
 // Routeur auto : décide si Goose doit déléguer à OMP et vers quel rôle.
 // Déterministe, sans LLM (rapide, auditable, testable).
 
+// DEV = verbes d'ACTION d'écriture uniquement, jamais noms d'artefacts :
+// "test"/"build" sortis — "ce test échoue, pourquoi ?" est un diagnostic
+// (architect), pas un ordre d'écrire. "ajoute un test" reste developer via "ajoute".
 const DEV = [
   "edit", "write", "modifie", "modifier", "cree", "creer", "implemente",
   "implementer", "refactor", "refactorise", "corrige", "corriger", "fix",
   "ajoute", "ajouter", "supprime", "supprimer", "migre", "migrer", "ecris",
-  "ecrire", "patch", "commit", "test", "tester", "build",
+  "ecrire", "patch", "commit",
 ];
 const ARCHI = [
   "architect", "architecture", "plan", "planifie", "planifier", "planification",

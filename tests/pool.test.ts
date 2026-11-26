@@ -55,4 +55,46 @@ describe("pool read-only", () => {
     await mgr.sessionStop(a.id);
     expect(() => mgr.releaseReadOnly(a)).not.toThrow();
   });
+
+  test("cap : pool plein -> la session en trop est stoppée, pas empilée", async () => {
+    process.env.OMP_BRIDGE_POOL_MAX = "1";
+    try {
+      const a = await mgr.acquireReadOnly({ workspace: "/tmp", role: "reviewer" });
+      mgr.releaseReadOnly(a);
+      expect(mgr.poolStats().pooled).toBe(1);
+      const b = await mgr.acquireReadOnly({ workspace: "/tmp", role: "architect" });
+      mgr.releaseReadOnly(b); // pool plein -> stop
+      await new Promise((r) => setTimeout(r, 50));
+      expect(mgr.poolStats().pooled).toBe(1);
+      // La 2e session n'est plus acquérable : le prochain acquire crée du neuf.
+      const c = await mgr.acquireReadOnly({ workspace: "/tmp", role: "architect" });
+      expect(c.id).not.toBe(b.id);
+      await mgr.sessionStop(c.id);
+      await mgr.sessionStop(a.id);
+    } finally {
+      delete process.env.OMP_BRIDGE_POOL_MAX;
+    }
+  });
+
+  test("stats hit/miss et parsing des knobs", async () => {
+    const before = mgr.poolStats();
+    const a = await mgr.acquireReadOnly({ workspace: "/tmp", role: "reviewer" });
+    mgr.releaseReadOnly(a);
+    const b = await mgr.acquireReadOnly({ workspace: "/tmp", role: "reviewer" });
+    expect(b.id).toBe(a.id);
+    const after = mgr.poolStats();
+    expect(after.misses).toBeGreaterThan(before.misses);
+    expect(after.hits).toBeGreaterThan(before.hits);
+    await mgr.sessionStop(a.id);
+    // Knobs invalides -> défauts sains, jamais NaN/0.
+    process.env.OMP_BRIDGE_POOL_MAX = "nawak";
+    process.env.OMP_BRIDGE_POOL_IDLE = "-5";
+    process.env.OMP_BRIDGE_POOL_ROTATE = "0";
+    expect(mgr.poolMax()).toBe(4);
+    expect(mgr.poolIdleMs()).toBe(300_000);
+    expect(mgr.poolRotateMs()).toBe(1_800_000);
+    delete process.env.OMP_BRIDGE_POOL_MAX;
+    delete process.env.OMP_BRIDGE_POOL_IDLE;
+    delete process.env.OMP_BRIDGE_POOL_ROTATE;
+  });
 });

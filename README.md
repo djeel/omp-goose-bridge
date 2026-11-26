@@ -4,7 +4,7 @@ Bridge **MCP** qui donne à [Goose](https://block.github.io/goose/) un moteur d'
 
 Goose orchestre et décide ; OMP exécute dans des sessions isolées. Le bridge expose 19 outils MCP, un panneau de suivi (MCP App inline + page web locale), des recipes, des agents et des slash commands.
 
-> **English TL;DR** — An MCP bridge that lets [Goose](https://block.github.io/goose/) delegate work to an external **OMP** engine over RPC, with a hard rule: **one writer per workspace** (read-only roles are enforced process-side). 19 MCP tools, inline MCP App panel, SQLite event log, recipes/agents, 62 tests, MIT. Full docs below are in French; see [`.env.example`](.env.example) for configuration.
+> **English TL;DR** — An MCP bridge that lets [Goose](https://block.github.io/goose/) delegate work to an external **OMP** engine over RPC, with a hard rule: **one writer per workspace** (read-only roles are enforced process-side). 19 MCP tools, inline MCP App panel, SQLite event log, recipes/agents, 67 tests, MIT. Full docs below are in French; see [`.env.example`](.env.example) for configuration.
 
 ```
 Goose (Desktop / CLI)
@@ -154,7 +154,7 @@ bun run probe                                  # handshake RPC réel
 bun run ci        # typecheck + lint + tests (ce que fait la CI)
 bun run check     # tsc --noEmit
 bun run lint      # biome lint .
-bun test          # 62 tests : guard, router, events, status, HTTP, client RPC (fake OMP), rôles, pool
+bun test          # 67 tests : guard, router, events, status, HTTP, client RPC (fake OMP), rôles, pool
 bun run bench     # micro-benchmarks des chemins chauds
 bun run probe     # handshake RPC réel avec OMP
 ```

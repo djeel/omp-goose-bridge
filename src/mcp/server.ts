@@ -6,7 +6,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { OmpRpc } from "../rpc/client.js";
-import { ROLE_SYSTEM, REVIEW_GATE, gitDiff, type Role } from "../core/roles.js";
+import { ROLE_SYSTEM, REVIEW_GATE, gitDiff, gitDiffParts, type Role } from "../core/roles.js";
 import {
   sessionCreate,
   sessionGet,
@@ -230,7 +230,17 @@ server.tool(
   { focus: z.string().optional() },
   async ({ focus }) => {
     const wsc = ws();
-    const diff = gitDiff(wsc, false).slice(0, MAX_OUTPUT);
+    // Budget explicite : le stat passe toujours, le diff est coupé avec marqueur.
+    // Le marqueur force NEED-MORE (jamais de GO sur du partiel, cf. REVIEW_GATE).
+    const parts = gitDiffParts(wsc, Math.max(4000, MAX_OUTPUT - 4000));
+    const diffText = parts.error
+      ? parts.error
+      : !parts.stat && !parts.diff
+        ? "(clean - rien a reviewer)"
+        : `${parts.stat}\n---\n${parts.diff}` +
+          (parts.truncated
+            ? `\n[DIFF TRONQUÉ — ${parts.missing} chars manquants : verdict NEED-MORE obligatoire, lister les fichiers à auditer]`
+            : "");
     const prompt =
       ROLE_SYSTEM.reviewer +
       "\n\n" +
@@ -238,7 +248,7 @@ server.tool(
       "\n\n" +
       (focus ? "Focus demande : " + focus + "\n\n" : "") +
       "DIFF a auditer :\n" +
-      (diff || "(clean - rien a reviewer)");
+      diffText;
     // Reviewer read-only : session chaude du pool, pas de spawn à froid.
     const s = await acquireReadOnly({ workspace: wsc, role: "reviewer", label: "review" });
     try {

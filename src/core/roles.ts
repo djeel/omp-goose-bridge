@@ -36,20 +36,39 @@ export function toolsFor(role: Role): string {
   }
 }
 
+/** Version structurée : distingue stat, diff et troncature (un seul spawn). */
+export function gitDiffParts(
+  cwd: string,
+  maxDiffChars = 12000,
+): { stat: string; diff: string; truncated: boolean; missing: number; error: string } {
+  const opts = { cwd, encoding: "utf8" as const, timeout: 15000, stdio: ["ignore", "pipe", "pipe"] as any };
+  const empty = { stat: "", diff: "", truncated: false, missing: 0, error: "" };
+  try {
+    // UN SEUL spawn : stat + diff dans le même shell (cf. ARCHITECTURE.md).
+    const raw: string =
+      execSync("git diff --stat && printf '\\n---DIFF---\\n' && git diff", opts) || "";
+    if (!raw.trim() || raw.trim() === "---DIFF---") return empty;
+    const idx = raw.indexOf("---DIFF---");
+    const stat = idx >= 0 ? raw.slice(0, idx).trimEnd() : raw;
+    const full = idx >= 0 ? raw.slice(idx + "---DIFF---".length).trim() : "";
+    if (full.length <= maxDiffChars) return { ...empty, stat, diff: full };
+    return { ...empty, stat, diff: full.slice(0, maxDiffChars), truncated: true, missing: full.length - maxDiffChars };
+  } catch (e: any) {
+    return { ...empty, error: `(pas un dépôt git ou diff indisponible: ${String(e.message).split("\n")[0]})` };
+  }
+}
+
 export function gitDiff(cwd: string, statOnly = false): string {
   const opts = { cwd, encoding: "utf8" as const, timeout: 15000, stdio: ["ignore", "pipe", "pipe"] as any };
   try {
     if (statOnly) {
       return execSync("git diff --stat", opts) || "(clean)";
     }
-    // UN SEUL spawn : stat + diff dans le même shell (cf. ARCHITECTURE.md).
-    const raw: string =
-      execSync("git diff --stat && printf '\n---DIFF---\n' && git diff", opts) || "";
-    if (!raw.trim() || raw.trim() === "---DIFF---") return "(clean)";
-    const idx = raw.indexOf("---DIFF---");
-    const stat = idx >= 0 ? raw.slice(0, idx).trimEnd() : raw;
-    const diff = idx >= 0 ? raw.slice(idx + "---DIFF---".length) : "";
-    return `${stat}\n---\n${diff.slice(0, 12000)}`.trim();
+    const { stat, diff, truncated, missing, error } = gitDiffParts(cwd);
+    if (error && !stat && !diff) return error;
+    if (!stat && !diff) return "(clean)";
+    const body = `${stat}\n---\n${diff}`.trim();
+    return truncated ? `${body}\n[DIFF TRONQUÉ — ${missing} chars manquants, verdict NEED-MORE]` : body;
   } catch (e: any) {
     return `(pas un dépôt git ou diff indisponible: ${String(e.message).split("\n")[0]})`;
   }
@@ -58,5 +77,6 @@ export function gitDiff(cwd: string, statOnly = false): string {
 export const REVIEW_GATE = `Gate review obligatoire :
 1. git diff --stat + contenu
 2. Bloquants (fichier:ligne + preuve) vs mineurs
-3. Verdict : GO / FIX (liste précise) / RE-DESIGN
-4. Jamais de modification par le reviewer.`;
+3. Verdict : GO / FIX (liste précise) / RE-DESIGN / NEED-MORE (diff tronqué : lister les fichiers à auditer par hunks, jamais de GO sur du partiel)
+4. Jamais de modification par le reviewer.
+5. NEED-MORE est obligatoire dès que le prompt contient [DIFF TRONQUÉ] : un GO sur un diff partiel est un faux verdict.`;

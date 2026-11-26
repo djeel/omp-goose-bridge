@@ -33,6 +33,13 @@ describe("routeTask", () => {
     expect(d.delegate).toBe(false);
   });
 
+  test("noms d'artefacts seuls -> pas de spawn writer", () => {
+    // Diagnostic ("ce test échoue, pourquoi ?") : architect, pas developer.
+    expect(routeTask("ce test echoue, pourquoi ? " + "x".repeat(380)).role).toBe("architect");
+    // Ordre d'écrire explicite : developer via le verbe, pas via "test".
+    expect(routeTask("ajoute un test unitaire").role).toBe("developer");
+  });
+
   test("petit prompt non délégué -> rôle null", () => {
     const d = routeTask("bonjour");
     expect(d.delegate).toBe(false);
