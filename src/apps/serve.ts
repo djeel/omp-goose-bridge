@@ -5,7 +5,7 @@ import { devStatusMarkdown } from "../core/status.js";
 import {
   HTTP_HOST,
   HTTP_PORT,
-  DEFAULT_WORKSPACE,
+  defaultWorkspace,
 } from "../config.js";
 import { safeWorkspace } from "../workspace/guard.js";
 import { readFileSync, existsSync } from "node:fs";
@@ -33,8 +33,20 @@ function pickWorkspace(body: any): string {
   return safeWorkspace(
     typeof body?.workspace === "string" && body.workspace.trim()
       ? body.workspace
-      : DEFAULT_WORKSPACE,
+      : defaultWorkspace(),
   );
+}
+
+/** Anti-CSRF : refuse les POST venant d'une origine web non locale. */
+function originAllowed(req: Request): boolean {
+  const origin = req.headers.get("origin");
+  if (!origin) return true; // curl / CLI / même origine
+  try {
+    const host = new URL(origin).hostname;
+    return host === "127.0.0.1" || host === "localhost" || host === "::1" || host === "[::1]";
+  } catch {
+    return false;
+  }
 }
 
 const server = Bun.serve({
@@ -43,7 +55,10 @@ const server = Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
 
-    if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+    if (req.method === "OPTIONS") {
+      if (!originAllowed(req)) return txt("origine refusée", 403);
+      return new Response(null, { headers: CORS });
+    }
 
     if (req.method === "GET" && url.pathname === "/healthz") return txt("ok");
 
@@ -56,6 +71,7 @@ const server = Bun.serve({
     }
 
     if (req.method === "POST" && url.pathname.startsWith("/mcp/")) {
+      if (!originAllowed(req)) return txt("origine refusée", 403);
       const tool = url.pathname.slice("/mcp/".length);
       let body: any = {};
       try {

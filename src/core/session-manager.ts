@@ -1,5 +1,6 @@
 import { OmpRpc } from "../rpc/client.js";
 import type { Role } from "./roles.js";
+import { SESSION_TTL_MS } from "../config.js";
 import {
   rpcArgsForRole,
   safeWorkspace,
@@ -18,6 +19,7 @@ export interface ManagedSession {
   workspace: string;
   rpc: OmpRpc;
   createdAt: number;
+  lastUsed: number;
   label?: string;
   role: Role;
 }
@@ -55,6 +57,7 @@ export async function sessionCreate(opts: {
     workspace: ws,
     rpc,
     createdAt: Date.now(),
+    lastUsed: Date.now(),
     label: opts.label,
     role,
   };
@@ -74,6 +77,7 @@ export async function sessionCreate(opts: {
 export function sessionGet(id: string): ManagedSession {
   const s = sessions.get(id);
   if (!s) throw new Error(`session inconnue: ${id} (list: ${[...sessions.keys()].join(", ") || "vide"})`);
+  s.lastUsed = Date.now();
   return s;
 }
 
@@ -147,3 +151,18 @@ export async function sessionStopAll(): Promise<number> {
   }
   return ids.length;
 }
+
+// Balayeur d'inactivité : évite les sessions/verrous fantômes si l'appelant a oublié stop.
+async function sweepIdle(): Promise<void> {
+  const now = Date.now();
+  for (const [id, s] of [...sessions]) {
+    if (now - s.lastUsed > SESSION_TTL_MS) {
+      try {
+        await sessionStop(id);
+      } catch {}
+    }
+  }
+}
+
+const sweeper = setInterval(() => void sweepIdle(), 60_000);
+sweeper.unref?.();

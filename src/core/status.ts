@@ -3,7 +3,12 @@ import { execSync } from "node:child_process";
 
 export function sh(cwd: string, cmd: string): string {
   try {
-    return execSync(cmd, { cwd, encoding: "utf8", timeout: 10000 });
+    return execSync(cmd, {
+      cwd,
+      encoding: "utf8",
+      timeout: 10000,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
   } catch {
     return "";
   }

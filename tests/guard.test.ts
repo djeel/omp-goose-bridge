@@ -1,5 +1,6 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { resolve } from "node:path";
+import { symlinkSync, rmSync } from "node:fs";
 
 // Les racines autorisées sont lues au chargement du module : on fixe l'env avant l'import.
 process.env.OMP_BRIDGE_ROOTS = "/tmp:/home/test/work";
@@ -29,6 +30,23 @@ describe("safeWorkspace", () => {
 
   test("rejette un workspace vide", () => {
     expect(() => safeWorkspace("")).toThrow(/vide/);
+  });
+
+  test("workspace par défaut = première racine autorisée", () => {
+    expect(safeWorkspace(undefined)).toBe("/tmp");
+  });
+
+  test("rejette l'évasion par symlink", () => {
+    const link = `/tmp/omp-bridge-evil-${process.pid}`;
+    try {
+      rmSync(link, { force: true });
+    } catch {}
+    symlinkSync("/etc", link);
+    try {
+      expect(() => safeWorkspace(link)).toThrow(/refusé/);
+    } finally {
+      rmSync(link, { force: true });
+    }
   });
 });
 

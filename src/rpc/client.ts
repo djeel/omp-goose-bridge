@@ -22,7 +22,10 @@ export class OmpRpc {
   private seq = 0;
   private promptSeq = 0;
   private pending = new Map<string, Pending>();
-  private resultWaiters = new Map<string, (v: any) => void>();
+  private resultWaiters = new Map<
+    string,
+    { resolve: (v: any) => void; reject: (e: Error) => void }
+  >();
   private lastText = "";
   private bridgeSessionId = "";
   private listeners = new Set<(msg: any) => void>();
@@ -145,7 +148,10 @@ export class OmpRpc {
       this.pending.delete(msg.id);
       if (p.timer) clearTimeout(p.timer);
       if (msg.success) p.resolve(msg);
-      else p.reject(new Error(msg.error ?? "erreur rpc"));
+      else {
+        const e = msg.error;
+        p.reject(new Error(typeof e === "string" ? e : (e?.message ?? JSON.stringify(e ?? "erreur rpc"))));
+      }
       return;
     }
     if (!msg?.type || msg.type === "response") return;
@@ -155,7 +161,7 @@ export class OmpRpc {
       this.saveEvent(kind, msg);
       const w = this.resultWaiters.get(msg.id)!;
       this.resultWaiters.delete(msg.id);
-      w(msg);
+      w.resolve(msg);
       return;
     }
     if (kind === "message_update") {
@@ -163,15 +169,17 @@ export class OmpRpc {
         const t = msg?.message?.text ?? msg?.text ?? msg?.delta?.text ?? "";
         if (typeof t === "string" && t) this.lastText = t;
       } catch {}
+      // message_update est très verbeux : jamais persisté (bloat SQLite).
+      if (VERBOSE) process.stderr.write("[omp-rpc] message_update\n");
+      return;
     }
     if (
-      kind === "message_update" ||
       kind === "prompt_result" ||
       kind === "session_settled" ||
       kind === "subagent_progress" ||
       kind === "subagent_lifecycle"
     ) {
-      if (kind !== "message_update" || this.lastText) this.saveEvent(kind, msg);
+      this.saveEvent(kind, msg);
       if (VERBOSE) process.stderr.write(`[omp-rpc] event ${kind}\n`);
     }
   }
@@ -219,9 +227,15 @@ export class OmpRpc {
         }
       }, timeoutMs);
       timer.unref?.();
-      this.resultWaiters.set(id, (v) => {
-        clearTimeout(timer);
-        resolve(v);
+      this.resultWaiters.set(id, {
+        resolve: (v) => {
+          clearTimeout(timer);
+          resolve(v);
+        },
+        reject: (err) => {
+          clearTimeout(timer);
+          reject(err);
+        },
       });
     });
 
@@ -243,6 +257,11 @@ export class OmpRpc {
   }
 
   abort() {
+    // Rejette immédiatement les attentes en cours (évite un blocage de 300 s).
+    for (const [id, w] of this.resultWaiters) {
+      this.resultWaiters.delete(id);
+      w.reject(new Error("aborted"));
+    }
     return this.send({ type: "abort" });
   }
 

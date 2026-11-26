@@ -19,7 +19,7 @@ import { devStatusMarkdown } from "../core/status.js";
 import { routeTask } from "../core/router.js";
 import { eventList, eventAppend } from "../events/store.js";
 import { safeWorkspace, writerHolder, rpcArgsForRole } from "../workspace/guard.js";
-import { DEFAULT_WORKSPACE, HTTP_PORT } from "../config.js";
+import { defaultWorkspace, HTTP_PORT } from "../config.js";
 
 // Pilotage OMP en RPC : Goose -> MCP -> 1 process RPC par session.
 // AUTORITE UNIQUE : seul developer mute. Tout le reste est read-only process.
@@ -76,7 +76,7 @@ server.registerResource(
   })
 );
 let rpc: OmpRpc | null = null;
-let workspace: string = DEFAULT_WORKSPACE;
+let workspace: string = defaultWorkspace();
 
 function ws(): string {
   return safeWorkspace(workspace);
@@ -171,8 +171,8 @@ server.tool(
   "Reviewer lecture seule : audite le diff, rend bloquants/mineurs + verdict GO/FIX",
   { focus: z.string().optional() },
   async ({ focus }) => {
-    const diff = gitDiff(ws(), false).slice(0, 10000);
-    const r = await ensureRpc();
+    const wsc = ws();
+    const diff = gitDiff(wsc, false).slice(0, 10000);
     const prompt =
       ROLE_SYSTEM.reviewer +
       "\n\n" +
@@ -181,8 +181,18 @@ server.tool(
       (focus ? "Focus demande : " + focus + "\n\n" : "") +
       "DIFF a auditer :\n" +
       (diff || "(clean - rien a reviewer)");
-    const text = await (r as any).promptAndWait(prompt);
-    return { content: [{ type: "text", text: String(text).slice(0, 12000) }] };
+    // Session dédiée (read-only) : isolation, pas de collision avec la session partagée.
+    const s = await sessionCreate({ workspace: wsc, label: "review", role: "reviewer" });
+    try {
+      const text = await s.rpc.promptAndWait(prompt);
+      return { content: [{ type: "text", text: String(text).slice(0, 12000) }] };
+    } catch (e: any) {
+      return { content: [{ type: "text", text: "review erreur: " + e.message }] };
+    } finally {
+      try {
+        await sessionStop(s.id);
+      } catch {}
+    }
   }
 );
 
@@ -197,8 +207,12 @@ server.tool(
     session_dir: z.string().optional(),
     label: z.string().optional(),
     force_role: z.enum(["architect", "researcher", "developer", "reviewer"]).optional(),
+    keep: z
+      .boolean()
+      .optional()
+      .describe("Conserver la session après réponse (défaut: false, éphémère)"),
   },
-  async ({ task, workspace: w, session_dir, label, force_role }) => {
+  async ({ task, workspace: w, session_dir, label, force_role, keep }) => {
     const wsc = safeWorkspace(w);
     workspace = wsc;
     const dec = force_role
@@ -227,6 +241,13 @@ server.tool(
       };
     } catch (e: any) {
       return { content: [{ type: "text", text: "auto route=" + role + " session=" + s.id + " erreur: " + e.message }] };
+    } finally {
+      // Éphémère par défaut : libère le process ET le verrou writer.
+      if (!keep) {
+        try {
+          await sessionStop(s.id);
+        } catch {}
+      }
     }
   }
 );
@@ -242,8 +263,12 @@ server.tool(
     workspace: z.string(),
     session_dir: z.string().optional(),
     label: z.string().optional(),
+    keep: z
+      .boolean()
+      .optional()
+      .describe("Conserver la session après réponse (défaut: false, éphémère)"),
   },
-  async ({ role, objective, workspace: w, session_dir, label }) => {
+  async ({ role, objective, workspace: w, session_dir, label, keep }) => {
     const wsc = safeWorkspace(w);
     workspace = wsc;
     if (role === "developer") {
@@ -264,6 +289,12 @@ server.tool(
       };
     } catch (e: any) {
       return { content: [{ type: "text", text: "session=" + s.id + " role=" + role + " erreur: " + e.message }] };
+    } finally {
+      if (!keep) {
+        try {
+          await sessionStop(s.id);
+        } catch {}
+      }
     }
   }
 );

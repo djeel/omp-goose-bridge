@@ -33,16 +33,17 @@ export function toolsFor(role: Role): string {
 }
 
 export function gitDiff(cwd: string, statOnly = false): string {
+  const opts = { cwd, encoding: "utf8" as const, timeout: 15000, stdio: ["ignore", "pipe", "pipe"] as any };
   try {
     if (statOnly) {
-      return execSync("git diff --stat", { cwd, encoding: "utf8", timeout: 15000 }) || "(clean)";
+      return execSync("git diff --stat", opts) || "(clean)";
     }
-    const stat = execSync("git diff --stat", { cwd, encoding: "utf8", timeout: 15000 });
-    const diff = execSync("git diff", { cwd, encoding: "utf8", timeout: 15000 });
+    const stat = execSync("git diff --stat", opts);
+    const diff = execSync("git diff", opts);
     const out = `${stat}\n---\n${diff.slice(0, 12000)}`;
     return out.trim() ? out : "(clean)";
   } catch (e: any) {
-    return `diff error: ${e.message}`;
+    return `(pas un dépôt git ou diff indisponible: ${String(e.message).split("\n")[0]})`;
   }
 }
 

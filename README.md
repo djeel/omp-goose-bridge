@@ -84,6 +84,10 @@ Les outils nécessitant le process OMP (`omp_auto`, `omp_review`, `omp_run_role`
 **Routage** : `omp_auto` (décide seul : petit → Goose direct, sinon rôle OMP)
 **Sessions** : `omp_run_role`, `omp_session_create|list|resume|new|stop|prompt`
 
+`omp_auto`, `omp_run_role` et `omp_review` sont **éphémères** : la session OMP est arrêtée
+après la réponse, ce qui libère le process et le verrou writer (`keep: true` pour conserver).
+Un balayeur stoppe aussi toute session inactive au-delà de `OMP_BRIDGE_SESSION_TTL`.
+
 ## Recipes, agents, slash commands
 
 ```bash
@@ -107,6 +111,7 @@ Tout est optionnel — voir [`.env.example`](.env.example).
 | `OMP_BRIDGE_WORKSPACE` | `cwd` | workspace par défaut |
 | `OMP_BRIDGE_DB` | `<repo>/data/bridge.db` | historique SQLite |
 | `OMP_BRIDGE_HTTP` / `_HOST` | `3210` / `127.0.0.1` | panneau |
+| `OMP_BRIDGE_SESSION_TTL` | `1800` | arrêt auto des sessions inactives (s) |
 | `OMP_BRIDGE_EVENTS_MAX` | `20000` | rétention |
 | `OMP_BRIDGE_VERBOSE` | `0` | logs stderr |
 
@@ -115,6 +120,7 @@ Tout est optionnel — voir [`.env.example`](.env.example).
 - Allowlist de workspaces (`OMP_BRIDGE_ROOTS`) — rejet hors racines, y compris évasion par préfixe.
 - Écriture impossible hors session `developer`, verrou single-writer par workspace.
 - Panneau HTTP **bind 127.0.0.1** par défaut (jamais exposé au LAN).
+- Panneau : POST refusé si l'`Origin` n'est pas locale (anti-CSRF).
 - Aucun secret dans le repo ; stdout réservé au protocole MCP (logs sur stderr).
 
 ## Tests

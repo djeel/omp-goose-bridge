@@ -1,5 +1,6 @@
 import { toolsFor, type Role } from "../core/roles.js";
-import { DEFAULT_WORKSPACE, workspaceRoots } from "../config.js";
+import { defaultWorkspace, workspaceRoots } from "../config.js";
+import { realpathSync } from "node:fs";
 import { resolve, sep } from "node:path";
 
 // WorkspaceGuard : allowlist de racines + single-writer par workspace.
@@ -11,13 +12,22 @@ function inside(root: string, path: string): boolean {
   return path.startsWith(root.endsWith(sep) ? root : root + sep);
 }
 
+/** Résout les symlinks quand le chemin existe (empêche l'évasion /tmp/lien -> /etc). */
+function realish(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
+}
+
 /** Valide et normalise un workspace (rejette hors allowlist). */
 export function safeWorkspace(ws: unknown): string {
-  const raw = String(ws ?? DEFAULT_WORKSPACE);
+  const raw = String(ws ?? defaultWorkspace());
   if (!raw.trim()) throw new Error("workspace vide");
-  const n = resolve(raw); // normalise + rend absolu
+  const n = realish(resolve(raw)); // normalise + symlinks
   for (const root of workspaceRoots()) {
-    if (inside(root, n)) return n;
+    if (inside(realish(root), n)) return n;
   }
   throw new Error(
     `workspace refusé: ${n} (autorisé: ${workspaceRoots().join(", ")})`,

@@ -30,9 +30,15 @@ export function workspaceRoots(): string[] {
 export const OMP_BIN = process.env.OMP_BIN || "omp";
 
 /** Workspace par défaut quand l'appelant n'en fournit pas. */
-export const DEFAULT_WORKSPACE = resolve(
-  process.env.OMP_BRIDGE_WORKSPACE || process.cwd(),
-);
+export function defaultWorkspace(): string {
+  const env = process.env.OMP_BRIDGE_WORKSPACE;
+  if (env && env.trim()) return resolve(env);
+  return workspaceRoots()[0] ?? resolve(process.cwd());
+}
+
+/** TTL d'inactivité avant arrêt automatique d'une session (secondes). */
+export const SESSION_TTL_MS =
+  Number(process.env.OMP_BRIDGE_SESSION_TTL ?? 1800) * 1000;
 
 /** Base SQLite de l'historique (lue à l'ouverture, surchargeable à chaud). */
 export function dbPath(): string {
