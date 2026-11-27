@@ -6,7 +6,10 @@ import {
   HTTP_HOST,
   HTTP_PORT,
   MAX_OUTPUT,
+  httpRatePerMin,
   ompBin,
+  ompSupported,
+  ompVersion,
   dbPath,
   defaultWorkspace,
   httpToken,
@@ -106,6 +109,7 @@ function health() {
   try {
     db = dbPath();
   } catch {}
+  const omp = ompVersion();
   return {
     ok: true,
     name: "omp-bridge",
@@ -116,10 +120,30 @@ function health() {
     workspace_roots: workspaceRoots(),
     workspace_writer: writerHolder(defaultWorkspace()),
     omp_bin: ompBin(),
+    omp_version: omp,
+    omp_supported: ompSupported(omp),
     db,
     sessions: sessionList().length,
     events: eventList({ limit: 1 }).length > 0,
   };
+}
+
+// --- Rate-limit des POST sans token : Token défini = auth, pas de plafond.
+// Sans token (localhost only), un plafond par IP/minute évite qu'une boucle
+// ou un onglet fou ne martèle le panneau.
+const postHits = new Map<string, number[]>();
+function postRateLimited(ip: string): boolean {
+  if (httpToken()) return false;
+  const max = httpRatePerMin();
+  const now = Date.now();
+  const recent = (postHits.get(ip) ?? []).filter((t) => now - t < 60_000);
+  recent.push(now);
+  postHits.set(ip, recent);
+  return recent.length > max;
+}
+
+export function _resetPostHitsForTests(): void {
+  postHits.clear();
 }
 
 /** Fabrique du serveur (testable : port 0 = aléatoire). */
@@ -127,7 +151,7 @@ export function createPanelServer(opts: { port?: number; hostname?: string } = {
   return Bun.serve({
   port: opts.port ?? HTTP_PORT,
   hostname: opts.hostname ?? HTTP_HOST,
-  async fetch(req) {
+  async fetch(req, srv) {
     const url = new URL(req.url);
 
     if (req.method === "OPTIONS") {
@@ -144,6 +168,8 @@ export function createPanelServer(opts: { port?: number; hostname?: string } = {
     if (req.method === "POST" && url.pathname.startsWith("/mcp/")) {
       if (!originAllowed(req)) return txt("origine refusée", 403);
       if (!authorized(req, url)) return txt("token requis", 401);
+      const ip = srv.requestIP(req)?.address ?? "inconnu";
+      if (postRateLimited(ip)) return txt("trop de requêtes, réessayez dans une minute", 429);
       const tool = url.pathname.slice("/mcp/".length);
       let body: any = {};
       try {

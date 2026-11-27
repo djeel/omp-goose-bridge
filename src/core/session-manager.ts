@@ -137,6 +137,7 @@ export async function sessionStop(id: string): Promise<void> {
     await s.rpc.stop();
   } catch {}
   sessions.delete(id);
+  poolIds.delete(id);
   if (s.role === "developer") releaseWriter(s.workspace, id);
   try {
     const { eventAppend } = await import("../events/store.js");
@@ -154,11 +155,110 @@ export async function sessionStopAll(): Promise<number> {
   return ids.length;
 }
 
+// --- Pool de sessions READ-ONLY : évite un spawn à froid par review/auto ---
+// Developer reste TOUJOURS éphémère (sécurité > perf) : jamais poolé.
+// Le pool est un simple index sur le registre `sessions` : list/sweep/stopAll
+// continuent de voir les sessions au repos (réutilisables si fraîches).
+// Bornes anti-dérive : POOL_MAX (cap), POOL_IDLE (repos max), POOL_ROTATE (âge max).
+
+const poolIds = new Set<string>();
+let poolHits = 0;
+let poolMisses = 0;
+
+/** Cap de sessions au repos (défaut 4 : ~4 × 300 Mo max en sommeil). */
+export function poolMax(): number {
+  const n = Number(process.env.OMP_BRIDGE_POOL_MAX ?? 4);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 4;
+}
+
+/** Fraîcheur max d'une session au repos pour être réutilisée (défaut 300 s). */
+export function poolIdleMs(): number {
+  const n = Number(process.env.OMP_BRIDGE_POOL_IDLE ?? 300);
+  return (Number.isFinite(n) && n > 0 ? n : 300) * 1000;
+}
+
+/** Âge max d'une session poolée : au-delà, rotation (contexte qui gonfle et dérive). */
+export function poolRotateMs(): number {
+  const n = Number(process.env.OMP_BRIDGE_POOL_ROTATE ?? 1800);
+  return (Number.isFinite(n) && n > 0 ? n : 1800) * 1000;
+}
+
+/** Compteurs hit/miss + taille, exposés dans omp_dev_status. */
+export function poolStats(): { hits: number; misses: number; pooled: number } {
+  return { hits: poolHits, misses: poolMisses, pooled: poolIds.size };
+}
+
+/**
+ * Récupère une session read-only chaude, ou en crée une.
+ * `developer` est refusé : l'écriture reste éphémère (sessionCreate + stop).
+ */
+export async function acquireReadOnly(opts: {
+  workspace: string;
+  role?: Role;
+  label?: string;
+}): Promise<ManagedSession> {
+  const role = opts.role ?? "reviewer";
+  if (role === "developer") {
+    throw new Error("developer n'est jamais poolé : session éphémère via sessionCreate");
+  }
+  const ws = safeWorkspace(opts.workspace);
+  const now = Date.now();
+  // Réclamation synchrone : pas d'await dans le scan, deux acquire
+  // concurrents ne peuvent pas récupérer la même session.
+  for (const s of sessions.values()) {
+    if (
+      poolIds.has(s.id) &&
+      s.role === role &&
+      s.workspace === ws &&
+      s.rpc.isRunning() &&
+      now - s.lastUsed < poolIdleMs() &&
+      now - s.createdAt < poolRotateMs()
+    ) {
+      poolIds.delete(s.id);
+      s.lastUsed = now;
+      if (opts.label) s.label = opts.label;
+      poolHits++;
+      return s;
+    }
+  }
+  poolMisses++;
+  // Rotation : une session trop âgée pourrit le pool (contexte dérivé) → stop + fraîche.
+  for (const s of [...sessions.values()]) {
+    if (
+      poolIds.has(s.id) &&
+      s.role === role &&
+      s.workspace === ws &&
+      now - s.createdAt >= poolRotateMs()
+    ) {
+      try {
+        await sessionStop(s.id);
+      } catch {}
+      break;
+    }
+  }
+  return sessionCreate({ workspace: ws, role, label: opts.label ?? role });
+}
+
+/** Rend une session read-only au pool (reste vivante pour le prochain appel). */
+export function releaseReadOnly(s: ManagedSession): void {
+  if (!sessions.has(s.id)) return;
+  if (s.role === "developer") return;
+  s.lastUsed = Date.now();
+  // Pool plein : on stoppe au lieu d'empiler (chaque process ≈ 300 Mo).
+  if (!poolIds.has(s.id) && poolIds.size >= poolMax()) {
+    void sessionStop(s.id).catch(() => {});
+    return;
+  }
+  poolIds.add(s.id);
+}
+
 // Balayeur d'inactivité : évite les sessions/verrous fantômes si l'appelant a oublié stop.
+// Les sessions au repos sont stoppées dès POOL_IDLE (borne RAM), les autres à SESSION_TTL.
 async function sweepIdle(): Promise<void> {
   const now = Date.now();
   for (const [id, s] of [...sessions]) {
-    if (now - s.lastUsed > SESSION_TTL_MS) {
+    const limit = poolIds.has(id) ? poolIdleMs() : SESSION_TTL_MS;
+    if (now - s.lastUsed > limit) {
       try {
         await sessionStop(id);
       } catch {}

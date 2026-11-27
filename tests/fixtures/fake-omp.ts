@@ -6,6 +6,12 @@ import { createInterface } from "node:readline";
 const SLOW = process.env.FAKE_OMP_SLOW === "1";
 const CRASH = process.env.FAKE_OMP_CRASH === "1";
 
+// `fake-omp --version` : le bridge lit la version via `OMP_BIN --version` (omp_health).
+if (process.argv.includes("--version")) {
+  console.log(process.env.FAKE_OMP_VERSION || "omp/19.2.1-fake");
+  process.exit(0);
+}
+
 let lastText = "";
 const out = (o: unknown) => process.stdout.write(`${JSON.stringify(o)}\n`);
 

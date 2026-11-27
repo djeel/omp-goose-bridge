@@ -274,6 +274,11 @@ export class OmpRpc {
     return this.send({ type: "get_subagents" });
   }
 
+  /** Vrai si le process OMP est vivant (utilisé par le pool read-only). */
+  isRunning(): boolean {
+    return this.proc !== null && this.proc.exitCode === null;
+  }
+
   /** Arrête le process et attend sa sortie (évite les orphelins). */
   async stop(timeoutMs = 3000): Promise<void> {
     const proc = this.proc;

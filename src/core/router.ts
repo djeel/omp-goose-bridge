@@ -3,11 +3,14 @@ import type { Role } from "./roles.js";
 // Routeur auto : décide si Goose doit déléguer à OMP et vers quel rôle.
 // Déterministe, sans LLM (rapide, auditable, testable).
 
+// DEV = verbes d'ACTION d'écriture uniquement, jamais noms d'artefacts :
+// "test"/"build" sortis — "ce test échoue, pourquoi ?" est un diagnostic
+// (architect), pas un ordre d'écrire. "ajoute un test" reste developer via "ajoute".
 const DEV = [
   "edit", "write", "modifie", "modifier", "cree", "creer", "implemente",
   "implementer", "refactor", "refactorise", "corrige", "corriger", "fix",
   "ajoute", "ajouter", "supprime", "supprimer", "migre", "migrer", "ecris",
-  "ecrire", "patch", "commit", "test", "tester", "build",
+  "ecrire", "patch", "commit",
 ];
 const ARCHI = [
   "architect", "architecture", "plan", "planifie", "planifier", "planification",
@@ -66,6 +69,9 @@ export function routeTask(text: string): RouteDecision {
   if (RX_DEV.test(t))
     return { delegate: true, role: "developer", reason: "mot-clé mutation" };
   if (t.length > 400)
-    return { delegate: true, role: "developer", reason: "prompt long, délégation par défaut" };
+    // Long sans mot-clé de mutation : plan lecture seule plutôt que writer.
+    // Un spawn developer à froid coûte cher ; l'architecte peut demander
+    // la délégation écriture ensuite si besoin.
+    return { delegate: true, role: "architect", reason: "prompt long, plan lecture seule par défaut" };
   return { delegate: false, role: null, reason: "petit, Goose direct" };
 }

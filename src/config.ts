@@ -1,5 +1,6 @@
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 // Configuration centralisée — tout est surchargeable par variables d'environnement.
 // Aucun chemin propre à une machine n'est codé en dur.
@@ -66,3 +67,35 @@ export const PROMPT_TIMEOUT_MS =
 
 /** Taille max d'un texte renvoyé à Goose (caractères). */
 export const MAX_OUTPUT = Number(process.env.OMP_BRIDGE_MAX_OUTPUT ?? 12000) || 12000;
+
+/** Version du binaire OMP (`omp --version`), mise en cache process. */
+let cachedOmpVersion: string | null | undefined;
+export function ompVersion(): string | null {
+  if (cachedOmpVersion !== undefined) return cachedOmpVersion;
+  try {
+    const out = execFileSync(ompBin(), ["--version"], {
+      encoding: "utf8",
+      timeout: 10000,
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+    cachedOmpVersion = out.split("\n")[0].trim() || null;
+  } catch {
+    cachedOmpVersion = null;
+  }
+  return cachedOmpVersion;
+}
+
+/** Le bridge est testé contre OMP 19.x (negotiate v2) : autre version = alerte, pas panne. */
+export function ompSupported(v: string | null): boolean {
+  return v !== null && /(^|\/)19\./.test(v);
+}
+
+/** POSTs du panneau sans token : plafond par IP et par minute (anti-boucle/abuse local). */
+export function httpRatePerMin(): number {
+  const n = Number(process.env.OMP_BRIDGE_HTTP_RATE ?? 60);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 60;
+}
+
+export function _resetOmpVersionForTests(): void {
+  cachedOmpVersion = undefined;
+}

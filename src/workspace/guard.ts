@@ -1,6 +1,7 @@
 import { toolsFor, type Role } from "../core/roles.js";
-import { defaultWorkspace, workspaceRoots } from "../config.js";
-import { realpathSync } from "node:fs";
+import { defaultWorkspace, workspaceRoots, SESSION_TTL_MS } from "../config.js";
+import { realpathSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 
@@ -66,22 +67,85 @@ export function isReadOnly(role: Role): boolean {
 
 const writerLocks = new Map<string, string>();
 
+// --- Verrou fichier : protège contre DEUX processus bridge en parallèle ---
+// (ex. Goose CLI + Goose Desktop spawment chacun leur stdio bridge).
+// Sans lui, la Map mémoire ne voit pas l'autre instance et deux developers
+// mutent le même workspace. Création atomique via flag "wx".
+
+/** Dossier des verrous (surchargeable pour les tests). */
+function locksRoot(): string {
+  return resolve(
+    process.env.OMP_BRIDGE_LOCKS_DIR ??
+      join(homedir(), ".local", "share", "omp-bridge", "locks"),
+  );
+}
+
+function lockPath(workspace: string): string {
+  const h = createHash("sha256").update(workspace).digest("hex").slice(0, 32);
+  return join(locksRoot(), h + ".lock");
+}
+
+function readLockFile(workspace: string): { holder: string; ts: number } | null {
+  try {
+    const lines = readFileSync(lockPath(workspace), "utf8").split("\n");
+    if (!lines[0]) return null;
+    return { holder: lines[0], ts: Number(lines[1]) || 0 };
+  } catch {
+    return null;
+  }
+}
+
+function removeLockFile(workspace: string): void {
+  try {
+    rmSync(lockPath(workspace), { force: true });
+  } catch {}
+}
+
+function lockStale(ts: number): boolean {
+  return Date.now() - ts > SESSION_TTL_MS;
+}
+
 export function tryAcquireWriter(workspace: string, sessionId: string): void {
-  const holder = writerLocks.get(workspace);
-  if (holder && holder !== sessionId) {
+  const mem = writerLocks.get(workspace);
+  if (mem && mem !== sessionId) {
     throw new Error(
-      `workspace ${workspace} déjà verrouillé par ${holder} (single-writer)`,
+      `workspace ${workspace} déjà verrouillé par ${mem} (single-writer)`,
     );
+  }
+  try {
+    mkdirSync(locksRoot(), { recursive: true });
+    writeFileSync(lockPath(workspace), `${sessionId}\n${Date.now()}\n`, { flag: "wx" });
+  } catch (e: any) {
+    if (e?.code !== "EEXIST") throw e;
+    const cur = readLockFile(workspace);
+    if (cur && cur.holder !== sessionId && !lockStale(cur.ts)) {
+      throw new Error(
+        `workspace ${workspace} déjà verrouillé par ${cur.holder} (single-writer)`,
+      );
+    }
+    // Ré-entrant (même session) ou verrou périmé/orphelin : on (ré)écrit.
+    writeFileSync(lockPath(workspace), `${sessionId}\n${Date.now()}\n`);
   }
   writerLocks.set(workspace, sessionId);
 }
 
 export function releaseWriter(workspace: string, sessionId: string): void {
   if (writerLocks.get(workspace) === sessionId) writerLocks.delete(workspace);
+  const cur = readLockFile(workspace);
+  if (cur && cur.holder === sessionId) removeLockFile(workspace);
 }
 
 export function writerHolder(workspace: string): string | null {
-  return writerLocks.get(workspace) ?? null;
+  const mem = writerLocks.get(workspace);
+  if (mem) return mem;
+  const cur = readLockFile(workspace);
+  if (!cur) return null;
+  // Un verrou périmé ne bloque personne (crash d'une autre instance).
+  if (lockStale(cur.ts)) {
+    removeLockFile(workspace);
+    return null;
+  }
+  return cur.holder;
 }
 
 export function rpcArgsForRole(role: Role): string[] {

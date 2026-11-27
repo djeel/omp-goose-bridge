@@ -2,6 +2,25 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) · [SemVer](https://semver.org/lang/fr/).
 
+## [Unreleased]
+
+### Ajouté
+- Pool de sessions read-only (`acquireReadOnly`/`releaseReadOnly`) : `omp_review`, `omp_auto` et `omp_run_role` non-developer réutilisent une session chaude (fraîcheur 300 s via `OMP_BRIDGE_POOL_IDLE`) au lieu d'un spawn à froid par appel. `developer` reste éphémère.
+- Verrou writer multi-processus : `tryAcquireWriter`/`releaseWriter`/`writerHolder` doublent la Map mémoire d'un verrou fichier atomique (`~/.local/share/omp-bridge/locks/`, `OMP_BRIDGE_LOCKS_DIR` pour les tests, vol après `SESSION_TTL_MS` si crash).
+- `researcher` reçoit `web_search`, `architect`/`reviewer` reçoivent `lsp` (toujours sans edit/write/bash/task).
+- `omp_dev_panel` annonce l'URL fallback locale quand le client ne rend pas les MCP Apps inline.
+- Tests `roles` (whitelist, `gitDiff` propre/hors-dépôt) et `pool` (réutilisation, isolation workspaces, refus developer).
+- Pool borné : cap 4 sessions au repos (`OMP_BRIDGE_POOL_MAX`), stop dès 300 s d'inactivité, rotation à 1800 s d'âge (`OMP_BRIDGE_POOL_ROTATE`), compteurs hit/miss exposés dans `omp_dev_status`.
+- `gitDiffParts` : stat + diff + troncature explicite ; `omp_review` construit un prompt budgété et impose **NEED-MORE** sur diff partiel (plus de GO aveugle).
+- `omp_health`/`healthz` exposent `omp_version` (`OMP_BIN --version`) + `omp_supported` (19.x testé : alerte, pas panne).
+- Rate-limit des POST du panneau sans token : `OMP_BRIDGE_HTTP_RATE` par IP/minute (429 au-delà, inactif si token défini).
+
+### Corrigé
+- Prompt long sans mot-clé routé en `architect` (lecture seule) au lieu de `developer` : plus de spawn writer à froid par défaut.
+- Routeur : "test"/"tester"/"build" sortis de DEV — "ce test échoue, pourquoi ?" va en `architect` (diagnostic), "ajoute un test" reste `developer` via le verbe.
+- `gitDiff` en un seul spawn (stat + diff dans le même shell) ; dépôt propre retourne `(clean)` au lieu de `"---"`.
+- Comptes docs : 19 outils (plus 20), 67 tests (plus 41/52).
+
 ## [1.2.0] — 2026-11-26
 
 ### Ajouté
