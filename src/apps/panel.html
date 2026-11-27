@@ -2,118 +2,210 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>OMP Bridge — panneau dev</title>
+<title>OMP Bridge</title>
 <script type="application/ld+json">
-{"@context":"urn:goose.ai:schema","@type":"GooseApp","name":"omp-dev-panel","description":"Panneau OMP Bridge : activité live Goose → OMP, sessions, writer, diff","width":900,"height":620,"resizable":true}
+{"@context":"urn:goose.ai:schema","@type":"GooseApp","name":"omp-dev-panel","description":"Activité OMP en direct : runs, rôles, durées, verrou writer","width":680,"height":360,"resizable":true}
 </script>
 <style>
-*{box-sizing:border-box}
-body{margin:0;font:13px/1.45 system-ui,sans-serif;padding:14px}
-body.dark{background:#101014;color:#e8e3f0}
-body.light{background:#f6f6f8;color:#1d1d1f}
-h1{font-size:17px;margin:0;display:flex;align-items:center;gap:8px}
-.card{border-radius:10px;padding:10px 12px;margin-bottom:10px}
-body.dark .card{background:#1a1a22;border:1px solid #2c2c3a}
-body.light .card{background:#fff;border:1px solid #e2e2e6}
-.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
-.kpi{padding:8px 10px;border-radius:8px}
-body.dark .kpi{background:#14141b;border:1px solid #262633}
-body.light .kpi{background:#fafafc;border:1px solid #ececf1}
-.kpi b{display:block;font-size:16px;line-height:1.2}
-.kpi span{font-size:11px;opacity:.65;text-transform:uppercase;letter-spacing:.04em}
-.dot{width:8px;height:8px;border-radius:50%;background:#888;display:inline-block}
-.dot.on{background:#34c759;box-shadow:0 0 0 3px rgba(52,199,89,.18)}
-.dot.off{background:#ff453a}
-#conn{font-size:12px;opacity:.8;margin-left:auto}
-button{border-radius:8px;padding:6px 10px;cursor:pointer;font-weight:600;font-size:12px}
-body.dark button{background:#262634;color:#eee;border:1px solid #3a3a4a}
-body.light button{background:#0071e3;color:#fff;border:1px solid #0071e3}
-button:hover{opacity:.85}
-input{width:100%;padding:7px;border-radius:8px;font-size:12px}
-body.dark input{background:#0e0e13;color:#eee;border:1px solid #333}
-body.light input{background:#fff;color:#1d1d1f;border:1px solid #ccc}
-#timeline{list-style:none;margin:0;padding:0;max-height:300px;overflow:auto}
-#timeline li{display:grid;grid-template-columns:56px 74px 1fr;gap:8px;align-items:baseline;
-  padding:5px 2px;border-bottom:1px dashed rgba(128,128,128,.18);font-size:12px}
-#timeline li:last-child{border-bottom:0}
-t{opacity:.5;font-variant-numeric:tabular-nums;font-size:11px}
-.chip{font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px;text-align:center;
-  text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.c-prompt{background:#0a3d62;color:#bfe4ff}
-.c-done{background:#0b3d1e;color:#a8f0c0}
-.c-route{background:#3b2a5a;color:#d9c6ff}
-.c-session{background:#123c3c;color:#a8eeea}
-.c-stop{background:#2b2b2b;color:#bbb}
-.c-sub{background:#4a2f10;color:#ffd8a8}
-.c-other{background:#33333f;color:#ccc}
-body.light .c-prompt{background:#dbeafe;color:#1e40af}
-body.light .c-done{background:#dcfce7;color:#166534}
-body.light .c-route{background:#ede9fe;color:#5b21b6}
-body.light .c-session{background:#ccfbf1;color:#115e59}
-body.light .c-stop{background:#eee;color:#555}
-body.light .c-sub{background:#ffedd5;color:#9a3412}
-body.light .c-other{background:#eee;color:#444}
-.sum{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sid{opacity:.45;font-size:10px}
-pre{border-radius:8px;padding:9px;overflow:auto;max-height:260px;white-space:pre-wrap;font-size:11px}
-body.dark pre{background:#0c0c10;border:1px solid #2a2a35}
-body.light pre{background:#f5f5f7;border:1px solid #ddd}
-details summary{cursor:pointer;font-weight:600;font-size:12px;opacity:.8}
-h3{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;opacity:.7}
-.hint{font-size:11px;opacity:.6;margin-top:6px}
-.empty{font-size:12px;opacity:.6;padding:6px 2px}
+  :root {
+    --bg: #0c0c10;
+    --fg: #e9e9ee;
+    --muted: #8d8d99;
+    --faint: #5c5c67;
+    --line: rgba(255,255,255,.07);
+    --line-strong: rgba(255,255,255,.14);
+    --accent: #7b87ff;
+    --ok: #3ddc97;
+    --warn: #ffb454;
+    --err: #ff5f56;
+    --hover: rgba(255,255,255,.035);
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  body.light {
+    --bg: #fcfcfd;
+    --fg: #17171b;
+    --muted: #66666f;
+    --faint: #9a9aa3;
+    --line: rgba(0,0,0,.085);
+    --line-strong: rgba(0,0,0,.16);
+    --accent: #4b57e0;
+    --ok: #0f7a51;
+    --warn: #8a5100;
+    --err: #bf2820;
+    --hover: rgba(0,0,0,.028);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 12.5px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 0 12px 10px;
+  }
+
+  /* ---- entête ---- */
+  .bar {
+    display: flex; align-items: center; gap: 8px;
+    height: 36px; border-bottom: 1px solid var(--line);
+  }
+  .mark { font: 600 10.5px/1 var(--mono); letter-spacing: .1em; }
+  .sep { width: 1px; height: 10px; background: var(--line-strong); }
+  .ws {
+    color: var(--muted); font: 11.5px var(--mono);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch;
+  }
+  .spacer { flex: 1; }
+  .live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--faint); }
+  .live i { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); display: block; }
+  .live.on { color: var(--muted); }
+  .live.on i { background: var(--ok); }
+  .live.busy { color: var(--warn); }
+  .live.busy i { background: var(--warn); animation: breathe 1.9s ease-in-out infinite; }
+  @keyframes breathe { 0%, 100% { opacity: 1 } 50% { opacity: .3 } }
+  @media (prefers-reduced-motion: reduce) { .live.busy i, .run[data-state="running"] .dot { animation: none } }
+
+  /* ---- bandeau de mesures ---- */
+  .stats {
+    display: flex; flex-wrap: wrap; gap: 0 16px; align-items: baseline;
+    padding: 7px 0 8px; border-bottom: 1px solid var(--line);
+    font-size: 11.5px; color: var(--muted);
+  }
+  .s { display: inline-flex; gap: 5px; align-items: baseline; white-space: nowrap; }
+  .k { color: var(--faint); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; }
+  .v { font: 11.5px var(--mono); color: var(--fg); font-variant-numeric: tabular-nums; }
+  .v.dim { color: var(--muted); }
+
+  /* ---- timeline ---- */
+  .feed { position: relative; }
+  .feed::after {
+    content: ""; position: absolute; inset: auto 0 0; height: 22px;
+    background: linear-gradient(to bottom, transparent, var(--bg));
+    opacity: 0; transition: opacity .12s linear; pointer-events: none;
+  }
+  .feed.more::after { opacity: 1; }
+  ol { list-style: none; margin: 0; padding: 0 2px 0 0; max-height: 232px; overflow-y: auto; overscroll-behavior: contain; }
+  ol::-webkit-scrollbar { width: 7px; }
+  ol::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; }
+
+  li { display: grid; align-items: baseline; gap: 10px; }
+  .run {
+    grid-template-columns: 58px 78px minmax(0, 1fr) auto;
+    padding: 6px 0; border-bottom: 1px solid var(--line);
+  }
+  .run:hover { background: var(--hover); }
+  .run:last-child { border-bottom: 0; }
+  time { font: 10.5px/1.6 var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }
+
+  .role { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); flex: none; }
+  .run[data-state="running"] .dot { background: var(--warn); animation: breathe 1.9s ease-in-out infinite; }
+  .run[data-state="running"] .role { color: var(--fg); }
+  .run[data-state="ok"] .dot { background: var(--ok); }
+  .run[data-state="err"] .dot { background: var(--err); }
+  .run[data-state="err"] .role { color: var(--err); }
+
+  .task { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .run[data-state="idle"] .task { color: var(--muted); }
+  .dur {
+    font: 10.5px/1.6 var(--mono); color: var(--faint);
+    font-variant-numeric: tabular-nums; text-align: right;
+    min-width: 46px; padding-right: 2px;
+    white-space: nowrap;
+  }
+  .run[data-state="running"] .dur { color: var(--warn); }
+
+  .note {
+    grid-template-columns: 58px 1fr;
+    padding: 3px 0; font-size: 11px; color: var(--faint);
+  }
+  .note .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .note b { font-weight: 500; color: var(--muted); }
+
+  .empty { padding: 16px 0 18px; color: var(--faint); font-size: 12px; }
+  .empty b { font-weight: 500; color: var(--muted); }
+
+  /* ---- pied ---- */
+  .foot {
+    display: flex; align-items: center; gap: 4px;
+    height: 38px; border-top: 1px solid var(--line);
+  }
+  input#ws {
+    flex: 1; min-width: 80px;
+    background: transparent; border: 0; border-bottom: 1px solid transparent;
+    color: var(--fg); font: 11.5px var(--mono); padding: 5px 0; outline: 0;
+  }
+  input#ws::placeholder { color: var(--faint); }
+  input#ws:focus { border-bottom-color: var(--line-strong); }
+  button {
+    appearance: none; background: transparent; border: 0; border-radius: 5px;
+    color: var(--muted); font: 500 11.5px system-ui, sans-serif;
+    padding: 5px 7px; cursor: pointer;
+  }
+  button:hover { color: var(--fg); background: var(--hover); }
+  button:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+
+  .more { margin-top: 2px; }
+  .more summary { display: inline-block; cursor: pointer; color: var(--faint); font-size: 11px; padding: 4px 0; list-style: none; }
+  .more summary::-webkit-details-marker { display: none; }
+  .more summary:hover { color: var(--muted); }
+  .more summary::after { content: " →"; }
+  .more[open] summary::after { content: " ←"; }
+  pre {
+    margin: 4px 0 0; padding: 9px 10px; border-radius: 6px;
+    background: var(--hover); border: 1px solid var(--line);
+    max-height: 210px; overflow: auto;
+    font: 10.5px/1.55 var(--mono); color: var(--muted); white-space: pre-wrap;
+  }
 </style>
 </head>
 <body class="dark">
 <!--BOOTSTRAP-->
-<div class="row" style="margin-bottom:10px">
-  <h1>OMP Bridge <span class="dot off" id="dot"></span></h1>
-  <span id="conn">connexion…</span>
-</div>
 
-<div class="card">
-  <div class="kpis">
-    <div class="kpi"><span>Sessions</span><b id="kSess">–</b></div>
-    <div class="kpi"><span>Writer</span><b id="kWriter">–</b></div>
-    <div class="kpi"><span>Pool</span><b id="kPool">–</b></div>
-    <div class="kpi"><span>Branche</span><b id="kBranch">–</b></div>
-    <div class="kpi"><span>OMP</span><b id="kOmp">–</b></div>
-  </div>
-</div>
+<header class="bar">
+  <span class="mark">OMP</span>
+  <span class="sep"></span>
+  <span class="ws" id="wsLabel" title="">—</span>
+  <span class="spacer"></span>
+  <span class="live" id="live"><i></i><span id="liveLabel">connexion</span></span>
+</header>
 
-<div class="card">
-  <h3>Activité Goose → OMP</h3>
-  <ul id="timeline"><li class="empty">En attente d'événements…</li></ul>
-</div>
+<section class="stats">
+  <span class="s"><span class="k">runs</span><span class="v" id="kRuns">0</span></span>
+  <span class="s"><span class="k">sessions</span><span class="v dim" id="kSess">0</span></span>
+  <span class="s"><span class="k">writer</span><span class="v dim" id="kWriter">libre</span></span>
+  <span class="s"><span class="k">pool</span><span class="v dim" id="kPool">0 · 0/0</span></span>
+  <span class="s"><span class="k">git</span><span class="v dim" id="kGit">—</span></span>
+  <span class="s"><span class="k">omp</span><span class="v dim" id="kOmp">—</span></span>
+</section>
 
-<div class="card">
-  <div class="row">
-    <input id="ws" placeholder="workspace (vide = défaut serveur)">
-  </div>
-  <div class="row" style="margin-top:8px">
-    <button id="bDiff">Diff</button>
-    <button id="bList">Sessions</button>
-    <button id="bEvents">Événements</button>
-    <button id="bHealth">Santé</button>
-    <button id="bSend">Envoyer au chat</button>
-  </div>
-  <div class="hint">Doit être sous une racine autorisée (OMP_BRIDGE_ROOTS).</div>
-</div>
+<section class="feed" id="feed">
+  <ol id="timeline"></ol>
+</section>
 
-<details class="card"><summary>Détail</summary><pre id="out">—</pre></details>
+<footer class="bar foot">
+  <input id="ws" placeholder="workspace (défaut serveur)" spellcheck="false" autocomplete="off">
+  <button id="bDiff" title="git diff du workspace">diff</button>
+  <button id="bList" title="sessions bridge vivantes">sessions</button>
+  <button id="bHealth" title="diagnostic">santé</button>
+</footer>
+
+<details class="more"><summary>détail</summary><pre id="out">—</pre></details>
 
 <script>
 "use strict";
-// --- Client MCP App (inline chat) : thème + resize + send-to-chat. Silencieux en standalone.
+// Thème forcé (?theme=light|dark) pour debug/capture : prioritaire sur l'hôte.
+const FORCED=new URLSearchParams(location.search).get("theme");
+const FORCED_OK=FORCED==="light"||FORCED==="dark";
+
+// --- Client MCP App : thème, resize, send-to-chat. Silencieux hors hôte. ---
 class McpAppClient {
   constructor(){this.seq=0;this.pending=new Map();
     window.addEventListener("message",e=>this.onMsg(e));this.init();}
   async init(){try{
     const r=await this.req("ui/initialize",{});
-    const theme=r&&r.hostContext&&r.hostContext.theme;
-    if(theme)this.applyTheme(theme);
-    else this.applyTheme(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");
+    const t=r&&r.hostContext&&r.hostContext.theme;
+    this.applyTheme(t||(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"));
     this.notify("ui/notifications/initialized",{});this.size();
   }catch(e){this.applyTheme(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");}}
   onMsg(e){const d=e.data;if(!d||typeof d!=="object")return;
@@ -126,161 +218,259 @@ class McpAppClient {
     window.parent.postMessage({jsonrpc:"2.0",id,method:m,params:p},"*");
     setTimeout(()=>{if(this.pending.has(id)){this.pending.delete(id);rej(new Error("timeout"));}},10000);});}
   notify(m,p){window.parent.postMessage({jsonrpc:"2.0",method:m,params:p},"*");}
-  applyTheme(t){document.body.className=(t==="light")?"light":"dark";}
-  size(){try{this.notify("ui/notifications/size-changed",{height:document.body.scrollHeight});}catch(e){}}
+  applyTheme(t){document.body.className=FORCED_OK?FORCED:((t==="light")?"light":"dark");}
+  size(){try{this.notify("ui/notifications/size-changed",{height:Math.ceil(document.body.getBoundingClientRect().height)});}catch(e){}}
   send(text){return this.req("ui/message",{content:{type:"text",text}});}
 }
-const mcpApp=new McpAppClient();
+const app=new McpAppClient();
 
-// --- Base HTTP : même origine si servie par serve.ts, sinon port du service local.
+// --- API locale (serve.ts) ---
 function apiBase(){
   if(location.protocol==="http:"||location.protocol==="https:")return location.origin;
-  const p=window.OMP_BRIDGE_HTTP||3210;
-  return "http://127.0.0.1:"+p;
+  return "http://127.0.0.1:"+(window.OMP_BRIDGE_HTTP||3210);
 }
 const TOKEN=new URLSearchParams(location.search).get("token")||"";
-function authQuery(){return TOKEN?("token="+encodeURIComponent(TOKEN)):"";}
-function headers(){
-  const h={"Content-Type":"application/json"};
-  if(TOKEN)h["x-omp-bridge-token"]=TOKEN;
-  return h;
+function wsValue(){return $("ws").value.trim();}
+function authQ(){
+  const w=wsValue();
+  return [w?("workspace="+encodeURIComponent(w)):"",TOKEN?("token="+encodeURIComponent(TOKEN)):""].filter(Boolean).join("&");
 }
 async function api(tool,args){
-  const r=await fetch(apiBase()+"/mcp/"+tool,{method:"POST",
-    headers:headers(),body:JSON.stringify(args||{})});
-  if(!r.ok)throw new Error("HTTP "+r.status+" : "+await r.text());
+  const h={"Content-Type":"application/json"};
+  if(TOKEN)h["x-omp-bridge-token"]=TOKEN;
+  const r=await fetch(apiBase()+"/mcp/"+tool,{method:"POST",headers:h,body:JSON.stringify(args||{})});
+  if(!r.ok)throw new Error("HTTP "+r.status+" — "+await r.text());
   return await r.text();
 }
-function ws(){return document.getElementById("ws").value.trim();}
-function wsQ(){const w=ws();return w?("workspace="+encodeURIComponent(w)+(TOKEN?"&"+authQuery():"")):(authQuery()?authQuery():"");}
-function wsArg(){const w=ws();return w?{workspace:w}:{};}
-function show(t){document.getElementById("out").textContent=t;mcpApp.size();}
-function connected(on,label){
-  document.getElementById("dot").className="dot "+(on?"on":"off");
-  document.getElementById("conn").textContent=label||(on?"live":"hors ligne");
+const $=id=>document.getElementById(id);
+const wsArg=()=>{const w=wsValue();return w?{workspace:w}:{};};
+const setText=(id,v)=>{const el=$(id);if(el&&el.textContent!==v)el.textContent=v;};
+const field=(s,k)=>{const m=new RegExp(k+"=([^\\s]+)").exec(s||"");return m?m[1]:"";};
+
+// --- état : une ligne par run OMP (pas une ligne par événement) ---
+const runs=new Map();   // session_id -> {el, roleEl, taskEl, durEl, t0, state, task}
+let runCount=0;
+let lastWs="";
+
+function setLive(state,label){
+  $("live").className="live"+(state?" "+state:"");
+  setText("liveLabel",label);
+}
+function fmtDur(ms){
+  const s=ms/1000;
+  return s<60? s.toFixed(1)+"s" : Math.floor(s/60)+"m"+String(Math.round(s%60)).padStart(2,"0")+"s";
+}
+function shortWs(p){
+  const parts=String(p||"").split("/").filter(Boolean);
+  return parts.length<=2?p:"…/"+parts.slice(-2).join("/");
+}
+function hhmmss(iso){
+  const d=new Date(iso);
+  return isNaN(d)? "--:--:--" : d.toLocaleTimeString([], {hour12:false});
 }
 
-// --- rendu des KPI depuis un statut (devStatus) ---
-function renderKpis(st){
-  if(!st)return;
-  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
-  set("kSess",String(st.sessions?st.sessions.length:0));
-  set("kWriter",st.writer||"libre");
-  set("kPool",st.pool?(st.pool.pooled+" · "+st.pool.hits+"/"+st.pool.misses):"–");
-  set("kBranch",st.isRepo?(st.branch+(st.dirty?(" ±"+st.dirty):"")):"hors dépôt");
-}
-
-// --- timeline ---
-const KIND={
-  prompt_sent:["→ OMP","c-prompt"],
-  prompt_done:["✓ OMP","c-done"],
-  prompt_result:["résultat","c-done"],
-  bridge_route:["route","c-route"],
-  bridge_session_create:["session","c-session"],
-  bridge_session_stop:["stop","c-stop"],
-  subagent_progress:["subagent","c-sub"],
-  subagent_lifecycle:["subagent","c-sub"],
-  session_settled:["settled","c-stop"],
-};
-const seen=new Set();
-function addEvent(e){
-  if(!e||e.id==null||seen.has(e.id))return;
-  seen.add(e.id);
-  const ul=document.getElementById("timeline");
-  const empty=ul.querySelector(".empty");if(empty)empty.remove();
-  const [label,cls]=KIND[e.kind]||[e.kind,"c-other"];
+function makeRun(sessionId,role,ts){
   const li=document.createElement("li");
-  const hh=new Date(e.ts).toLocaleTimeString();
-  li.innerHTML='<t></t><span class="chip '+cls+'"></span><span class="sum"></span>';
-  li.querySelector("t").textContent=hh;
-  li.querySelector(".chip").textContent=label;
-  const sum=li.querySelector(".sum");
-  sum.textContent=e.summary||"";
-  sum.title=(e.summary||"")+"\nsession "+e.session_id;
-  const sid=document.createElement("span");sid.className="sid";sid.textContent=" "+e.session_id;
-  sum.appendChild(sid);
-  ul.appendChild(li);
-  while(ul.children.length>80)ul.removeChild(ul.firstChild);
-  ul.scrollTop=ul.scrollHeight;
+  li.className="run";
+  li.dataset.state="idle";
+  li.dataset.session=sessionId;
+  li.innerHTML='<time></time><span class="role"><i class="dot"></i><span class="rn"></span></span>'+
+               '<span class="task"></span><span class="dur"></span>';
+  li.querySelector(".rn").textContent=role||"omp";
+  li.querySelector("time").textContent=ts?hhmmss(ts):"--:--:--";
+  li.title=sessionId;
+  const ol=$("timeline");
+  const empty=ol.querySelector(".empty");if(empty)empty.remove();
+  ol.appendChild(li);
+  const r={el:li,roleEl:li.querySelector(".rn"),taskEl:li.querySelector(".task"),
+           durEl:li.querySelector(".dur"),t0:null,state:"idle",task:""};
+  runs.set(sessionId,r);
+  runCount++;
+  setText("kRuns",String(runCount));
+  return r;
 }
 
-// --- flux live (SSE) + repli polling ---
-let es=null;
-function startStream(){
-  const q=wsQ();
-  const url=apiBase()+"/stream"+(q?("?"+q):"");
-  try{
-    es=new EventSource(url);
-  }catch(e){return startPolling();}
-  es.addEventListener("snapshot",ev=>{
-    const d=JSON.parse(ev.data);
-    connected(true,"live · "+d.workspace);
-    renderKpis(d.status);
-    if(d.omp_version)document.getElementById("kOmp").textContent=d.omp_version.replace(/^omp\//,"");
-    (d.events||[]).forEach(addEvent);
-    mcpApp.size();
-  });
-  es.addEventListener("event",ev=>{addEvent(JSON.parse(ev.data));mcpApp.size();});
-  es.addEventListener("ping",ev=>{
-    const d=JSON.parse(ev.data);
-    const k=document.getElementById("kSess");
-    if(k&&typeof d.sessions==="number")k.textContent=String(d.sessions);
-  });
-  es.onerror=()=>{connected(false,"reconnexion…");};
+// Lit un libellé lisible : "role=researcher | corrige le bug" (ou l'ancien format).
+function taskOf(summary){
+  const s=String(summary||"");
+  const i=s.indexOf(" | ");
+  let t=i>=0?s.slice(i+3).trim():s.replace(/^role=[^\s]+\s*/,"").replace(/^chars=\d+\s*:\s*/,"").trim();
+  // Ancien format : le prompt système était loggé tel quel. On ne l'affiche pas.
+  if(/^Tu es OMP /i.test(t))t="(prompt système)";
+  return t;
 }
-function startPolling(){
+
+function addEvent(e,fresh){
+  if(!e||e.id==null)return;
+  const sid=e.session_id;
+  if(e.kind==="bridge_route"){
+    const dec=(e.summary||"").replace(/^route\s*/,"");
+    appendNote(e.ts,dec);
+    return;
+  }
+  // Une session sans prompt n'apparaît pas : la timeline ne montre que les runs.
+  if(e.kind==="bridge_session_create")return;
+  if(e.kind==="prompt_sent"){
+    const r=runs.get(sid)||makeRun(sid,field(e.summary,"role"),e.ts);
+    r.t0=Date.parse(e.ts)||Date.now();
+    r.task=taskOf(e.summary);
+    r.taskEl.textContent=r.task;
+    r.taskEl.title=r.task;
+    r.el.dataset.state="running";
+    r.state="running";
+    scrollIfNear();
+    updateLive();
+    app.size();
+    return;
+  }
+  if(e.kind==="prompt_done"||e.kind==="prompt_result"){
+    const r=runs.get(sid);
+    if(!r)return;
+    const st=field(e.summary,"status");
+    if(e.kind==="prompt_result"&&!fresh)return;      // le done porte la durée
+    const d=/durée=([\d.]+)s/.exec(e.summary||"");
+    const err=/error|failed|erreur/i.test(st);
+    if(e.kind==="prompt_done"){
+      r.el.dataset.state=err?"err":"ok";
+      r.state=err?"err":"ok";
+      r.durEl.textContent=d?(Math.round(Number(d[1])*10)/10)+"s":"";
+      r.t0=null;
+      updateLive();
+      app.size();
+    }
+    return;
+  }
+  if(e.kind==="bridge_session_stop"){
+    const r=runs.get(sid);
+    if(r&&r.state==="idle"){r.el.remove();runs.delete(sid);runCount=Math.max(0,runCount-1);setText("kRuns",String(runCount));}
+    return;
+  }
+}
+
+function appendNote(ts,text){
+  const ol=$("timeline");
+  const empty=ol.querySelector(".empty");if(empty)empty.remove();
+  const li=document.createElement("li");
+  li.className="note";
+  li.innerHTML='<time></time><span class="what"><b></b> <span></span></span>';
+  li.querySelector("time").textContent=hhmmss(ts);
+  const parts=splitReason(text);
+  li.querySelector("b").textContent=parts.head;
+  li.querySelector(".what span").textContent=parts.rest;
+  ol.appendChild(li);
+  scrollIfNear();
+  app.size();
+}
+function splitReason(s){
+  const m=/^delegate=(true|false)\s*role=(\S+)\s*\((.*)\)\s*$/.exec(s||"");
+  if(m)return{head:m[2]==="null"?"goose direct":"→ "+m[2],rest:m[3]};
+  return{head:s,rest:""};
+}
+
+function scrollIfNear(){
+  const ol=$("timeline");
+  if(ol.scrollHeight-ol.scrollTop-ol.clientHeight<56)ol.scrollTop=ol.scrollHeight;
+}
+function updateFade(){
+  const ol=$("timeline");
+  $("feed").classList.toggle("more",ol.scrollHeight-ol.scrollTop-ol.clientHeight>2);
+}
+$("timeline").addEventListener("scroll",updateFade);
+
+// Compteur des runs en cours (aucun événement requis pendant l'attente).
+function updateLive(){
+  const now=Date.now();
+  let busy=0;
+  for(const [,r] of runs){
+    if(r.state!=="running"||!r.t0)continue;
+    if(now-r.t0>15*60*1000){r.el.dataset.state="err";r.state="err";r.durEl.textContent="timeout";continue;}
+    busy++;
+    r.durEl.textContent=fmtDur(now-r.t0);
+  }
+  setLive(busy?"on busy":"on",busy?(busy===1?"omp travaille":"omp · "+busy+" en cours"):"live");
+}
+setInterval(updateLive,200);
+
+// --- mesures ---
+function renderStats(st){
+  if(!st)return;
+  setText("kSess",String((st.sessions||[]).length));
+  setText("kWriter",st.writer||"libre");
+  $("kWriter").classList.toggle("dim",!st.writer);
+  if(st.pool)setText("kPool",st.pool.pooled+" · "+st.pool.hits+"/"+st.pool.misses);
+  setText("kGit",st.isRepo?st.branch+(st.dirty?" ±"+st.dirty:""):"hors dépôt");
+  if(st.workspace){
+    setText("wsLabel",shortWs(st.workspace));
+    $("wsLabel").title=st.workspace;
+    lastWs=st.workspace;
+    app.size();
+  }
+}
+
+// --- flux ---
+let es=null;
+function hydrate(d){
+  if(!d)return;
+  renderStats(d.status);
+  if(d.omp_version)setText("kOmp",String(d.omp_version).replace(/^omp\//,""));
+  (d.events||[]).forEach(e=>addEvent(e,false));
+  if(!runs.size&&!$("timeline").children.length){
+    $("timeline").innerHTML='<li class="empty">Aucun appel OMP récent. <b>Demande quelque chose à goose</b> — les runs apparaîtront ici.</li>';
+  }
+  scrollIfNear();updateLive();updateFade();app.size();
+}
+function startStream(){
+  const q=authQ();
+  try{es=new EventSource(apiBase()+"/stream"+(q?"?"+q:""));}
+  catch(e){return poll();}
+  es.addEventListener("snapshot",ev=>{hydrate(JSON.parse(ev.data));});
+  es.addEventListener("event",ev=>{addEvent(JSON.parse(ev.data),true);updateFade();});
+  es.addEventListener("ping",ev=>{try{const d=JSON.parse(ev.data);if(typeof d.sessions==="number")setText("kSess",String(d.sessions));}catch(e){}});
+  es.onerror=()=>{setLive("","reconnexion");};
+}
+function poll(){
   const loop=async()=>{
     try{
-      const q=wsQ();
-      const r=await fetch(apiBase()+"/activity"+(q?("?"+q):""));
+      const q=authQ();
+      const r=await fetch(apiBase()+"/activity"+(q?"?"+q:""));
       if(!r.ok)throw new Error("HTTP "+r.status);
-      const d=await r.json();
-      connected(true,"live (poll) · "+d.workspace);
-      renderKpis(d.status);
-      if(d.omp_version)document.getElementById("kOmp").textContent=d.omp_version.replace(/^omp\//,"");
-      (d.events||[]).forEach(addEvent);
-      mcpApp.size();
-    }catch(e){connected(false,"hors ligne — lancer : bun run panel");}
+      hydrate(await r.json());
+    }catch(e){setLive("","hors ligne");}
     setTimeout(loop,3000);
-  };
-  loop();
+  };loop();
 }
 
-// --- actions ---
-async function run(tool,args){
-  try{show(await api(tool,args));}
-  catch(e){show("Panneau HTTP injoignable — lancer : bun run panel\n"+e);connected(false);}
+// --- actions (le journal brut reste disponible, hors du chemin principal) ---
+async function run(tool,args,label){
+  $("out").textContent=label+"…";
+  try{$("out").textContent=await api(tool,args);}
+  catch(e){$("out").textContent="panneau HTTP injoignable — lancer : bun run panel\n"+e;}
+  $(".more").open=true;app.size();
 }
-document.getElementById("bDiff").onclick=()=>run("omp_get_diff",wsArg());
-document.getElementById("bList").onclick=()=>run("omp_sessions_list",{});
-document.getElementById("bEvents").onclick=()=>run("omp_events_list",{});
-document.getElementById("bHealth").onclick=async()=>{
-  try{const r=await fetch(apiBase()+"/healthz");show(JSON.stringify(await r.json(),null,1));}
-  catch(e){show("Panneau HTTP injoignable — lancer : bun run panel\n"+e);}
+$("bDiff").onclick=()=>run("omp_get_diff",wsArg(),"diff");
+$("bList").onclick=()=>run("omp_sessions_list",{},"sessions");
+$("bHealth").onclick=async()=>{
+  try{const r=await fetch(apiBase()+"/healthz");$("out").textContent=JSON.stringify(await r.json(),null,1);}
+  catch(e){$("out").textContent="panneau HTTP injoignable — lancer : bun run panel\n"+e;}
+  $(".more").open=true;app.size();
 };
-document.getElementById("bSend").onclick=async()=>{
-  const t=document.getElementById("out").textContent;
-  try{await mcpApp.send("OMP Bridge — panneau :\n"+t);}catch(e){show("Envoi chat impossible (mode standalone).\n"+e);}
-};
-document.getElementById("ws").addEventListener("change",()=>{
-  if(es){es.close();es=null;seen.clear();document.getElementById("timeline").innerHTML='<li class="empty">Filtre workspace…</li>';}
+$("ws").addEventListener("change",()=>{
+  if(es){es.close();es=null;}
+  runs.clear();runCount=0;setText("kRuns","0");
+  $("timeline").innerHTML="";
   startStream();
 });
+// double-clic sur la timeline : envoyer le résumé dans le chat (mode inline)
+$("timeline").addEventListener("dblclick",()=>{
+  const t=$("timeline").innerText.trim().slice(0,1500);
+  app.send("OMP Bridge — activité :\n"+t).catch(()=>{});
+});
 
-// --- amorçage : snapshot injecté par le serveur (affichage instantané, sans flash vide) ---
-const boot=document.getElementById("bootstrap");
-if(boot){
-  try{
-    const d=JSON.parse(boot.textContent||"{}");
-    if(d.workspace){document.getElementById("ws").value=d.workspace;connected(true,"live · "+d.workspace);}
-    renderKpis(d.status);
-    if(d.omp_version)document.getElementById("kOmp").textContent=d.omp_version.replace(/^omp\//,"");
-    (d.events||[]).forEach(addEvent);
-  }catch(e){}
-}
-
-// Démarrage : live immédiat (plus de bouton Refresh nécessaire).
+// --- démarrage ---
+const boot=$("bootstrap");
+if(boot){try{hydrate(JSON.parse(boot.textContent||"{}"));}catch(e){}}
 startStream();
+updateFade();
 </script>
 </body>
 </html>

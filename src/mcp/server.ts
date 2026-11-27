@@ -264,7 +264,7 @@ server.tool(
     // Reviewer read-only : session chaude du pool, pas de spawn à froid.
     const s = await acquireReadOnly({ workspace: wsc, role: "reviewer", label: "review" });
     try {
-      const text = await s.rpc.promptAndWait(prompt);
+      const text = await s.rpc.promptAndWait(prompt, undefined, "review " + (focus ?? "diff"));
       return { content: [{ type: "text", text: String(text).slice(0, MAX_OUTPUT) }] };
     } catch (e: any) {
       return { content: [{ type: "text", text: "review erreur: " + e.message }] };
@@ -315,7 +315,7 @@ server.tool(
       });
       // Éphémère : libère le process ET le verrou writer.
       try {
-        const text = await s.rpc.promptAndWait(prompt);
+        const text = await s.rpc.promptAndWait(prompt, undefined, task);
         return {
           content: [{ type: "text", text: "auto route=" + role + " session=" + s.id + "\n" + String(text).slice(0, MAX_OUTPUT) }],
         };
@@ -340,7 +340,7 @@ server.tool(
         })
       : await acquireReadOnly({ workspace: wsc, role, label: label ?? ("auto-" + role) });
     try {
-      const text = await s.rpc.promptAndWait(prompt);
+      const text = await s.rpc.promptAndWait(prompt, undefined, task);
       return {
         content: [{ type: "text", text: "auto route=" + role + " session=" + s.id + "\n" + String(text).slice(0, MAX_OUTPUT) }],
       };
@@ -392,7 +392,7 @@ server.tool(
         role: role as Role,
       });
       try {
-        const text = await s.rpc.promptAndWait(prompt);
+        const text = await s.rpc.promptAndWait(prompt, undefined, objective);
         return {
           content: [{ type: "text", text: "session=" + s.id + " role=" + role + "\n" + String(text).slice(0, MAX_OUTPUT) }],
         };
@@ -416,7 +416,7 @@ server.tool(
         })
       : await acquireReadOnly({ workspace: wsc, role: role as Role, label: label ?? (role as string) });
     try {
-      const text = await s.rpc.promptAndWait(prompt);
+      const text = await s.rpc.promptAndWait(prompt, undefined, objective);
       return {
         content: [{ type: "text", text: "session=" + s.id + " role=" + role + "\n" + String(text).slice(0, MAX_OUTPUT) }],
       };
@@ -543,7 +543,7 @@ server.tool(
       };
     }
     try {
-      const text = await s.rpc.promptAndWait(message);
+      const text = await s.rpc.promptAndWait(message, undefined, message);
       return { content: [{ type: "text", text: String(text).slice(0, MAX_OUTPUT) }] };
     } catch (e: any) {
       return { content: [{ type: "text", text: "prompt impossible: " + e.message }] };

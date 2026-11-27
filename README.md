@@ -83,16 +83,17 @@ Trois façons de voir ce que fait OMP, de la plus intégrée à la plus autonome
 | Fenêtre Goose | sidebar **Apps** → *omp-dev-panel* (HTML importé) | même panneau, plein écran |
 | Navigateur | `http://127.0.0.1:3210/` | même panneau, autonome |
 
-**Ce que la timeline montre** (mise à jour en direct, sans bouton Refresh) :
+**Une ligne par run** (mise à jour en direct, sans bouton Refresh) :
 
 ```
-22:36:50  ROUTE    delegate=true role=researcher (mot-clé recherche/docs)
-22:36:50  SESSION  create ws=/projets/app role=researcher label=auto-researcher
-22:36:50  → OMP    role=researcher chars=193 : Tu es OMP Researcher…
-22:37:08  RÉSULTAT prompt_result status=completed settled=true
-22:37:08  ✓ OMP    role=researcher durée=24.2s status=completed
-22:37:08  STOP     stop role=researcher
+22:41:46  ● researcher   cherche la doc de bun sqlite                       22.1s
+22:42:08  ● reviewer     review serve.ts                                    20.6s
+22:43:19  → researcher   mot-clé recherche/docs
+22:43:19  ● researcher   compare bun:sqlite et better-sqlite3…   → en cours 5.7s
 ```
+
+Le run en cours affiche un chrono qui tourne (point ambre) ; à la fin il passe en vert
+avec sa durée, ou en rouge en cas d'échec. `route` explique *pourquoi* OMP a été appelé.
 
 KPI affichés : sessions vivantes, verrou writer, pool read-only (au repos · hits/misses), branche ±fichiers modifiés, version OMP.
 

@@ -228,7 +228,12 @@ export class OmpRpc {
   }
 
   /** Envoie un prompt et attend le prompt_result (waiter enregistré AVANT l'envoi). */
-  async promptAndWait(message: string, timeoutMs = PROMPT_TIMEOUT_MS): Promise<string> {
+  async promptAndWait(
+    message: string,
+    timeoutMs = PROMPT_TIMEOUT_MS,
+    /** Libellé lisible pour la timeline (la tâche demandée, pas le prompt système). */
+    label?: string,
+  ): Promise<string> {
     this.lastText = "";
     const id = `p${++this.promptSeq}`;
     const resultP = new Promise<any>((resolve, reject) => {
@@ -256,7 +261,7 @@ export class OmpRpc {
       eventAppend({
         session_id: this.bridgeSessionId || "default",
         kind: "prompt_sent",
-        summary: `role=${this.bridgeRole} chars=${message.length} : ${message.replace(/\s+/g, " ").slice(0, 90)}`,
+        summary: `role=${this.bridgeRole} | ${(label ?? message).replace(/\s+/g, " ").slice(0, 140)}`,
       });
     } catch {}
     try {

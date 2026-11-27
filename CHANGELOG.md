@@ -2,6 +2,19 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) · [SemVer](https://semver.org/lang/fr/).
 
+## [1.4.1] — 2026-11-27
+
+### Modifié
+- **Panneau : une ligne par run**, plus une ligne par événement. Les sessions sans prompt n'apparaissent plus ; la timeline ne raconte que les appels OMP (rôle · tâche · durée · état).
+- Libellé de run = la tâche demandée (`task`/`objective`/`focus`), plus le prompt système : `promptAndWait(msg, timeout, label)`.
+- Chrono en direct sur le run en cours (point ambre, compteur qui tourne) : on voit qu'OMP travaille sans attendre le prochain événement.
+- Direction visuelle resserrée : hairlines, une seule police de labeur (mono) pour les chiffres, aucune carte ni ombre ; thème clair/sombre hérité de l'hôte.
+- `?theme=light|dark` pour forcer le thème (captures, debug).
+
+### Corrigé
+- Compteur de runs cohérent avec les lignes visibles.
+- Anciens événements (prompt système loggé tel quel) affichés « (prompt système) » au lieu d'un pavé.
+
 ## [1.4.0] — 2026-11-27
 
 ### Ajouté
