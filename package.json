@@ -1,6 +1,6 @@
 {
   "name": "omp-goose-bridge",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Bridge RPC entre Goose (orchestrateur) et OMP (moteur) — sessions, rôles read-only/writer, panneau MCP App",
   "type": "module",
   "license": "MIT",

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="dark">
 <head>
 <meta charset="UTF-8">
 <title>OMP Bridge</title>
@@ -7,97 +7,117 @@
 {"@context":"urn:goose.ai:schema","@type":"GooseApp","name":"omp-dev-panel","description":"Activité OMP en direct : runs, rôles, durées, verrou writer","width":680,"height":360,"resizable":true}
 </script>
 <style>
+  /* Même famille que Goose (Cash Sans) ; repli système si le CDN est bloqué. */
+  @font-face { font-family: 'Cash Sans'; font-weight: 300; font-style: normal; font-display: swap;
+    src: url(https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Light.woff2) format('woff2'); }
+  @font-face { font-family: 'Cash Sans'; font-weight: 400; font-style: normal; font-display: swap;
+    src: url(https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Regular.woff2) format('woff2'); }
+  @font-face { font-family: 'Cash Sans'; font-weight: 500; font-style: normal; font-display: swap;
+    src: url(https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Medium.woff2) format('woff2'); }
+  @font-face { font-family: 'Cash Sans'; font-weight: 600; font-style: normal; font-display: swap;
+    src: url(https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Semibold.woff2) format('woff2'); }
+  /* Tokens = design system de Goose (--color-*, --font-*, --border-radius-*).
+     Goose les injecte dans l'app via hostContext.styles.variables ; les valeurs
+     de repli sont celles du thème par défaut (dark #15141b / light #ffffff). */
   :root {
-    --bg: #0c0c10;
-    --fg: #e9e9ee;
-    --muted: #8d8d99;
-    --faint: #5c5c67;
-    --line: rgba(255,255,255,.07);
-    --line-strong: rgba(255,255,255,.14);
-    --accent: #7b87ff;
-    --ok: #3ddc97;
-    --warn: #ffb454;
-    --err: #ff5f56;
-    --hover: rgba(255,255,255,.035);
-    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: dark;
+    --surface: var(--color-background-primary, #15141b);
+    --surface-2: var(--color-background-secondary, #1a1921);
+    --fg: var(--color-text-primary, #edecee);
+    --muted: var(--color-text-secondary, #8a8282);
+    --faint: var(--color-text-tertiary, #6d6d6d);
+    --line: var(--color-border-primary, #2d2b38);
+    --line-strong: var(--color-border-secondary, #47415a);
+    --accent: var(--color-text-info, #82e2ff);
+    --ok: var(--color-text-success, #61ffca);
+    --warn: var(--color-text-warning, #ffca85);
+    --err: var(--color-text-danger, #ff6767);
+    --font: var(--font-sans, 'Cash Sans', system-ui, sans-serif);
+    --mono: var(--font-mono, ui-monospace, monospace);
+    --fs: var(--font-text-sm-size, .875rem);
+    --fs-xs: var(--font-text-xs-size, .75rem);
+    --radius: var(--border-radius-md, 8px);
+    --radius-sm: var(--border-radius-sm, 4px);
   }
-  body.light {
-    --bg: #fcfcfd;
-    --fg: #17171b;
-    --muted: #66666f;
-    --faint: #9a9aa3;
-    --line: rgba(0,0,0,.085);
-    --line-strong: rgba(0,0,0,.16);
-    --accent: #4b57e0;
-    --ok: #0f7a51;
-    --warn: #8a5100;
-    --err: #bf2820;
-    --hover: rgba(0,0,0,.028);
+  /* Repli thème clair (utile hors Goose : navigateur / app autonome). */
+  html.light {
+    color-scheme: light;
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f4f6f7;
+    --color-text-primary: #3f434b;
+    --color-text-secondary: #61616a;
+    --color-text-tertiary: #85858e;
+    --color-border-primary: #e3e6ea;
+    --color-border-secondary: #cbd1d6;
+    --color-text-info: #5c98f9;
+    --color-text-success: #91cb80;
+    --color-text-warning: #fbcd44;
+    --color-text-danger: #f94b4b;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
   body {
-    background: var(--bg);
+    background: var(--surface);
     color: var(--fg);
-    font: 12.5px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    font: 400 var(--fs)/1.45 var(--font);
     -webkit-font-smoothing: antialiased;
-    padding: 0 12px 10px;
+    padding: 0 14px 10px;
   }
 
   /* ---- entête ---- */
   .bar {
     display: flex; align-items: center; gap: 8px;
-    height: 36px; border-bottom: 1px solid var(--line);
+    height: 38px; border-bottom: 1px solid var(--line);
   }
-  .mark { font: 600 10.5px/1 var(--mono); letter-spacing: .1em; }
-  .sep { width: 1px; height: 10px; background: var(--line-strong); }
+  .mark { font: 600 var(--fs-xs)/1 var(--font); letter-spacing: .08em; color: var(--fg); }
+  .sep { width: 1px; height: 11px; background: var(--line-strong); }
   .ws {
-    color: var(--muted); font: 11.5px var(--mono);
+    color: var(--muted); font: var(--fs-xs)/1.4 var(--mono);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch;
   }
   .spacer { flex: 1; }
-  .live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--faint); }
+  .live { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--faint); }
   .live i { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); display: block; }
   .live.on { color: var(--muted); }
   .live.on i { background: var(--ok); }
   .live.busy { color: var(--warn); }
   .live.busy i { background: var(--warn); animation: breathe 1.9s ease-in-out infinite; }
-  @keyframes breathe { 0%, 100% { opacity: 1 } 50% { opacity: .3 } }
+  @keyframes breathe { 0%, 100% { opacity: 1 } 50% { opacity: .32 } }
   @media (prefers-reduced-motion: reduce) { .live.busy i, .run[data-state="running"] .dot { animation: none } }
 
   /* ---- bandeau de mesures ---- */
   .stats {
     display: flex; flex-wrap: wrap; gap: 0 16px; align-items: baseline;
     padding: 7px 0 8px; border-bottom: 1px solid var(--line);
-    font-size: 11.5px; color: var(--muted);
+    font-size: var(--fs-xs); color: var(--muted);
   }
   .s { display: inline-flex; gap: 5px; align-items: baseline; white-space: nowrap; }
-  .k { color: var(--faint); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; }
-  .v { font: 11.5px var(--mono); color: var(--fg); font-variant-numeric: tabular-nums; }
+  .k { color: var(--faint); font-size: calc(var(--fs-xs) - 1px); letter-spacing: .07em; text-transform: uppercase; }
+  .v { font: var(--fs-xs) var(--mono); color: var(--fg); font-variant-numeric: tabular-nums; }
   .v.dim { color: var(--muted); }
 
   /* ---- timeline ---- */
   .feed { position: relative; }
   .feed::after {
     content: ""; position: absolute; inset: auto 0 0; height: 22px;
-    background: linear-gradient(to bottom, transparent, var(--bg));
+    background: linear-gradient(to bottom, transparent, var(--surface));
     opacity: 0; transition: opacity .12s linear; pointer-events: none;
   }
   .feed.more::after { opacity: 1; }
-  ol { list-style: none; margin: 0; padding: 0 2px 0 0; max-height: 232px; overflow-y: auto; overscroll-behavior: contain; }
+  ol { list-style: none; margin: 0; padding: 0 2px 0 0; max-height: 236px; overflow-y: auto; overscroll-behavior: contain; }
   ol::-webkit-scrollbar { width: 7px; }
-  ol::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; }
+  ol::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: var(--radius-sm); }
 
   li { display: grid; align-items: baseline; gap: 10px; }
   .run {
-    grid-template-columns: 58px 78px minmax(0, 1fr) auto;
+    grid-template-columns: 60px 80px minmax(0, 1fr) auto;
     padding: 6px 0; border-bottom: 1px solid var(--line);
   }
-  .run:hover { background: var(--hover); }
   .run:last-child { border-bottom: 0; }
-  time { font: 10.5px/1.6 var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }
+  .run:hover { background: var(--surface-2); border-radius: var(--radius-sm); }
+  time { font: var(--fs-xs)/1.6 var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }
 
-  .role { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+  .role { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs); color: var(--muted); }
   .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); flex: none; }
   .run[data-state="running"] .dot { background: var(--warn); animation: breathe 1.9s ease-in-out infinite; }
   .run[data-state="running"] .role { color: var(--fg); }
@@ -108,58 +128,52 @@
   .task { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .run[data-state="idle"] .task { color: var(--muted); }
   .dur {
-    font: 10.5px/1.6 var(--mono); color: var(--faint);
+    font: var(--fs-xs)/1.6 var(--mono); color: var(--faint);
     font-variant-numeric: tabular-nums; text-align: right;
-    min-width: 46px; padding-right: 2px;
-    white-space: nowrap;
+    min-width: 46px; padding-right: 2px; white-space: nowrap;
   }
   .run[data-state="running"] .dur { color: var(--warn); }
 
-  .note {
-    grid-template-columns: 58px 1fr;
-    padding: 3px 0; font-size: 11px; color: var(--faint);
-  }
+  .note { grid-template-columns: 60px 1fr; padding: 4px 0; font-size: var(--fs-xs); color: var(--faint); }
   .note .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .note b { font-weight: 500; color: var(--muted); }
+  .note b.arrow { color: var(--accent); }
 
-  .empty { padding: 16px 0 18px; color: var(--faint); font-size: 12px; }
+  .empty { padding: 16px 0 18px; color: var(--faint); font-size: var(--fs); }
   .empty b { font-weight: 500; color: var(--muted); }
 
   /* ---- pied ---- */
-  .foot {
-    display: flex; align-items: center; gap: 4px;
-    height: 38px; border-top: 1px solid var(--line);
-  }
+  .foot { display: flex; align-items: center; gap: 4px; height: 40px; border-top: 1px solid var(--line); }
   input#ws {
     flex: 1; min-width: 80px;
     background: transparent; border: 0; border-bottom: 1px solid transparent;
-    color: var(--fg); font: 11.5px var(--mono); padding: 5px 0; outline: 0;
+    color: var(--muted); font: var(--fs-xs) var(--mono); padding: 5px 0; outline: 0;
   }
   input#ws::placeholder { color: var(--faint); }
-  input#ws:focus { border-bottom-color: var(--line-strong); }
+  input#ws:focus { color: var(--fg); border-bottom-color: var(--line-strong); }
   button {
-    appearance: none; background: transparent; border: 0; border-radius: 5px;
-    color: var(--muted); font: 500 11.5px system-ui, sans-serif;
+    appearance: none; background: transparent; border: 0; border-radius: var(--radius-sm);
+    color: var(--muted); font: 500 var(--fs-xs) var(--font);
     padding: 5px 7px; cursor: pointer;
   }
-  button:hover { color: var(--fg); background: var(--hover); }
+  button:hover { color: var(--fg); background: var(--surface-2); }
   button:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
 
   .more { margin-top: 2px; }
-  .more summary { display: inline-block; cursor: pointer; color: var(--faint); font-size: 11px; padding: 4px 0; list-style: none; }
+  .more summary { display: inline-block; cursor: pointer; color: var(--faint); font-size: var(--fs-xs); padding: 4px 0; list-style: none; }
   .more summary::-webkit-details-marker { display: none; }
   .more summary:hover { color: var(--muted); }
   .more summary::after { content: " →"; }
   .more[open] summary::after { content: " ←"; }
   pre {
-    margin: 4px 0 0; padding: 9px 10px; border-radius: 6px;
-    background: var(--hover); border: 1px solid var(--line);
+    margin: 4px 0 0; padding: 10px 12px; border-radius: var(--radius);
+    background: var(--surface-2); border: 1px solid var(--line);
     max-height: 210px; overflow: auto;
-    font: 10.5px/1.55 var(--mono); color: var(--muted); white-space: pre-wrap;
+    font: var(--fs-xs)/1.6 var(--mono); color: var(--muted); white-space: pre-wrap;
   }
 </style>
 </head>
-<body class="dark">
+<body>
 <!--BOOTSTRAP-->
 
 <header class="bar">
@@ -204,21 +218,40 @@ class McpAppClient {
     window.addEventListener("message",e=>this.onMsg(e));this.init();}
   async init(){try{
     const r=await this.req("ui/initialize",{});
-    const t=r&&r.hostContext&&r.hostContext.theme;
-    this.applyTheme(t||(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"));
+    const hc=r&&r.hostContext;
+    this.applyHostStyles(hc);
+    this.applyTheme((hc&&hc.theme)||(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"));
     this.notify("ui/notifications/initialized",{});this.size();
   }catch(e){this.applyTheme(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");}}
+  // Goose fournit ses propres tokens (couleurs, typo, radius) : on les applique tels quels,
+  // l'app hérite alors exactement du design system de l'hôte.
+  applyHostStyles(hc){
+    const v=hc&&hc.styles&&hc.styles.variables;
+    if(v&&typeof v==="object"){
+      for(const k of Object.keys(v)){
+        const val=v[k];
+        if(typeof val==="string")document.documentElement.style.setProperty(k,val);
+      }
+    }
+    const fonts=hc&&hc.styles&&hc.styles.css&&hc.styles.css.fonts;
+    if(typeof fonts==="string"&&fonts&&!document.getElementById("host-fonts")){
+      const el=document.createElement("style");el.id="host-fonts";el.textContent=fonts;
+      document.head.appendChild(el);
+    }
+  }
   onMsg(e){const d=e.data;if(!d||typeof d!=="object")return;
     if("id" in d&&this.pending.has(d.id)){const p=this.pending.get(d.id);
       this.pending.delete(d.id);d.error?p.reject(new Error(d.error.message)):p.resolve(d.result);return;}
-    if(d.method==="ui/notifications/host-context-changed"&&d.params&&d.params.theme)
-      this.applyTheme(d.params.theme);}
+    if(d.method==="ui/notifications/host-context-changed"&&d.params){
+      this.applyHostStyles(d.params);
+      if(d.params.theme)this.applyTheme(d.params.theme);
+    }}
   req(m,p){return new Promise((res,rej)=>{const id=++this.seq;
     this.pending.set(id,{resolve:res,reject:rej});
     window.parent.postMessage({jsonrpc:"2.0",id,method:m,params:p},"*");
     setTimeout(()=>{if(this.pending.has(id)){this.pending.delete(id);rej(new Error("timeout"));}},10000);});}
   notify(m,p){window.parent.postMessage({jsonrpc:"2.0",method:m,params:p},"*");}
-  applyTheme(t){document.body.className=FORCED_OK?FORCED:((t==="light")?"light":"dark");}
+  applyTheme(t){document.documentElement.className=FORCED_OK?FORCED:((t==="light")?"light":"dark");}
   size(){try{this.notify("ui/notifications/size-changed",{height:Math.ceil(document.body.getBoundingClientRect().height)});}catch(e){}}
   send(text){return this.req("ui/message",{content:{type:"text",text}});}
 }
@@ -355,7 +388,9 @@ function appendNote(ts,text){
   li.innerHTML='<time></time><span class="what"><b></b> <span></span></span>';
   li.querySelector("time").textContent=hhmmss(ts);
   const parts=splitReason(text);
-  li.querySelector("b").textContent=parts.head;
+  const b=li.querySelector("b");
+  b.textContent=parts.head;
+  if(parts.head.startsWith("→"))b.classList.add("arrow");
   li.querySelector(".what span").textContent=parts.rest;
   ol.appendChild(li);
   scrollIfNear();
@@ -402,6 +437,7 @@ function renderStats(st){
   if(st.workspace){
     setText("wsLabel",shortWs(st.workspace));
     $("wsLabel").title=st.workspace;
+    if(!$("ws").value.trim())$("ws").value=st.workspace;   // le flux garde le même scope
     lastWs=st.workspace;
     app.size();
   }

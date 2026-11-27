@@ -97,6 +97,10 @@ avec sa durée, ou en rouge en cas d'échec. `route` explique *pourquoi* OMP a �
 
 KPI affichés : sessions vivantes, verrou writer, pool read-only (au repos · hits/misses), branche ±fichiers modifiés, version OMP.
 
+Le panneau n'a pas de palette propre : il applique les tokens envoyés par Goose
+(`hostContext.styles.variables` → `--color-*`, `--font-*`, `--border-radius-*`),
+donc il suit le thème clair/sombre de l'app et sa police (Cash Sans).
+
 - API lecture : `GET /activity?workspace=…` (snapshot JSON), `GET /stream` (SSE : `snapshot`, `event`, `ping`)
 - API actions : `POST /mcp/{omp_dev_status,omp_get_diff,omp_sessions_list,omp_events_list}`
 - Le panneau est amorcé côté serveur (snapshot SSR) puis suit le flux SSE : il est déjà rempli au premier rendu.

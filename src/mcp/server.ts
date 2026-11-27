@@ -69,7 +69,11 @@ function panelHtml(): string {
 
 const PANEL_UI_META = {
   ui: {
-    csp: { connectDomains: [`http://127.0.0.1:${HTTP_PORT}`] },
+    csp: {
+      // pont HTTP local + police de marque de Goose (Cash Sans)
+      connectDomains: [`http://127.0.0.1:${HTTP_PORT}`],
+      resourceDomains: ["https://cash-f.squarecdn.com"],
+    },
     prefersBorder: true,
   },
 };

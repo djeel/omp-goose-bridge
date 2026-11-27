@@ -2,6 +2,15 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) · [SemVer](https://semver.org/lang/fr/).
 
+## [1.4.2] — 2026-11-27
+
+### Modifié
+- **Le panneau hérite du design system de Goose** au lieu d'une palette maison : il applique `hostContext.styles.variables` (`--color-*`, `--font-*`, `--border-radius-*`) reçus de l'hôte, avec pour repli les valeurs du thème Goose par défaut (fond `#15141b`, texte `#edecee`, bordures `#2d2b38`, accent `#82e2ff`).
+- Typographie Goose : Cash Sans via `--font-sans` (et `@font-face` local pour le mode navigateur), tailles `--font-text-sm-size` / `--font-text-xs-size`.
+- Accent = `--color-text-info` (cyan en sombre, bleu en clair) : plus aucune couleur hors palette.
+- `resourceDomains` du MCP App élargi à la police de marque ; CSP du panneau (`font-src`) en conséquence.
+- Repli thème clair avec contraste AA (`--color-text-secondary` plus sombre) hors Goose.
+
 ## [1.4.1] — 2026-11-27
 
 ### Modifié
