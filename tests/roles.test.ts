@@ -41,7 +41,12 @@ describe("gitDiff", () => {
   test("gros diff -> tronqué avec compteur de manquants", () => {
     const dir = mkdtempSync(join(tmpdir(), "omp-bigdiff-"));
     try {
-      execSync("git init -q && git commit -q --allow-empty -m init", { cwd: dir });
+      // Identité explicite : les runners CI (et certaines machines) n'ont pas de
+      // user.name/user.email global — sans ça le commit échoue et le test casse.
+      execSync(
+        'git init -q && git -c user.name=t -c user.email=t@t commit -q --allow-empty -m init',
+        { cwd: dir },
+      );
       writeFileSync(join(dir, "big.txt"), "x".repeat(20000));
       execSync("git add -N big.txt", { cwd: dir }); // intent-to-add : visible dans git diff sans stager
       const parts = gitDiffParts(dir, 1000);
@@ -58,7 +63,12 @@ describe("gitDiff", () => {
   test("dépôt propre -> (clean)", () => {
     const dir = mkdtempSync(join(tmpdir(), "omp-diff-"));
     try {
-      execSync("git init -q && git commit -q --allow-empty -m init", { cwd: dir });
+      // Identité explicite : les runners CI (et certaines machines) n'ont pas de
+      // user.name/user.email global — sans ça le commit échoue et le test casse.
+      execSync(
+        'git init -q && git -c user.name=t -c user.email=t@t commit -q --allow-empty -m init',
+        { cwd: dir },
+      );
       expect(gitDiff(dir, true)).toBe("(clean)");
       expect(gitDiff(dir, false)).toBe("(clean)");
     } finally {

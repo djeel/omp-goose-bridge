@@ -2,7 +2,7 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) · [SemVer](https://semver.org/lang/fr/).
 
-## [Unreleased]
+## [1.3.0] — 2026-11-27
 
 ### Ajouté
 - Pool de sessions read-only (`acquireReadOnly`/`releaseReadOnly`) : `omp_review`, `omp_auto` et `omp_run_role` non-developer réutilisent une session chaude (fraîcheur 300 s via `OMP_BRIDGE_POOL_IDLE`) au lieu d'un spawn à froid par appel. `developer` reste éphémère.
@@ -19,7 +19,8 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) · [SemVer](ht
 - Prompt long sans mot-clé routé en `architect` (lecture seule) au lieu de `developer` : plus de spawn writer à froid par défaut.
 - Routeur : "test"/"tester"/"build" sortis de DEV — "ce test échoue, pourquoi ?" va en `architect` (diagnostic), "ajoute un test" reste `developer` via le verbe.
 - `gitDiff` en un seul spawn (stat + diff dans le même shell) ; dépôt propre retourne `(clean)` au lieu de `"---"`.
-- Comptes docs : 19 outils (plus 20), 67 tests (plus 41/52).
+- Comptes docs : 19 outils (plus 20), 74 tests (plus 41/52).
+- Tests `roles` : identité git explicite (`-c user.name/-c user.email`) — les dépôts temporaires échouaient sur une machine sans identité globale (et sur les runners CI).
 
 ## [1.2.0] — 2026-11-26
 
