@@ -21,19 +21,28 @@ export const ROLE_SYSTEM: Record<Role, string> = {
     "avec fichier:ligne + preuve, sans modifier. INTERDIT : edit, write, bash avec mutation.",
 };
 
-// Overlay --tools : whitelist par rôle (noms exacts vus via get_state).
-// researcher a web_search (docs, libs, solutions) mais ni edit/write ni task ;
-// architect/reviewer ont lsp (navigation code) sans mutation.
+// Overlay --tools : whitelist par rôle.
+// ⚠ OMP 19.x sort en code 2 si --tools contient un nom inconnu (vérifié : "lsp"
+// n'est pas un outil, le LSP se pilote via --no-lsp). On filtre donc sur une
+// liste blanche validée contre le binaire, au lieu de faire tomber le rôle.
+export const KNOWN_TOOLS = new Set([
+  "read", "bash", "edit", "glob", "grep", "find", "task", "wait", "todo", "write", "web_search",
+]);
+
+const ROLE_TOOLS: Record<Role, string[]> = {
+  developer: ["read", "bash", "edit", "glob", "grep", "find", "task", "wait", "todo", "write"],
+  researcher: ["read", "glob", "grep", "find", "web_search", "wait", "todo"],
+  architect: ["read", "glob", "grep", "find", "wait", "todo"],
+  reviewer: ["read", "glob", "grep", "find", "wait", "todo"],
+};
+
 export function toolsFor(role: Role): string {
-  switch (role) {
-    case "developer":
-      return "read,bash,edit,glob,grep,find,task,wait,todo,write";
-    case "researcher":
-      return "read,glob,grep,find,web_search,wait,todo";
-    case "architect":
-    case "reviewer":
-      return "read,glob,grep,find,lsp,wait,todo";
+  const list = ROLE_TOOLS[role] ?? ROLE_TOOLS.reviewer;
+  const unknown = list.filter((t) => !KNOWN_TOOLS.has(t));
+  if (unknown.length) {
+    console.error(`[omp-bridge] tools inconnus ignorés (${role}): ${unknown.join(", ")}`);
   }
+  return list.filter((t) => KNOWN_TOOLS.has(t)).join(",");
 }
 
 /** Version structurée : distingue stat, diff et troncature (un seul spawn). */

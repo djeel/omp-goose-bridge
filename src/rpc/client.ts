@@ -129,6 +129,12 @@ export class OmpRpc {
     }
   }
 
+  /** Rôle du bridge pour l'étiquetage de la timeline (posé par sessionCreate). */
+  private bridgeRole = "?";
+  setBridgeRole(role: string): void {
+    this.bridgeRole = role;
+  }
+
   private saveEvent(kind: string, msg: any) {
     try {
       eventAppend({
@@ -244,6 +250,15 @@ export class OmpRpc {
       });
     });
 
+    // Trace de départ : la timeline du panneau montre "Goose → OMP" en direct.
+    const t0 = Date.now();
+    try {
+      eventAppend({
+        session_id: this.bridgeSessionId || "default",
+        kind: "prompt_sent",
+        summary: `role=${this.bridgeRole} chars=${message.length} : ${message.replace(/\s+/g, " ").slice(0, 90)}`,
+      });
+    } catch {}
     try {
       await this.send({ id, type: "prompt", message });
     } catch (e) {
@@ -252,6 +267,13 @@ export class OmpRpc {
     }
 
     const result = await resultP;
+    try {
+      eventAppend({
+        session_id: this.bridgeSessionId || "default",
+        kind: "prompt_done",
+        summary: `role=${this.bridgeRole} durée=${((Date.now() - t0) / 1000).toFixed(1)}s status=${result?.status ?? "?"}`,
+      });
+    } catch {}
     if (result.status === "error") throw new Error(result?.error?.message ?? "prompt échoué");
 
     try {

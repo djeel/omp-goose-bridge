@@ -2,6 +2,18 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) · [SemVer](https://semver.org/lang/fr/).
 
+## [1.4.0] — 2026-11-27
+
+### Ajouté
+- **Panneau live** : timeline temps réel de l'activité Goose → OMP (route → session → prompt → résultat → durée → stop), KPI (sessions, writer, pool hits/misses, branche, version OMP).
+- `GET /stream` (SSE : `snapshot`, `event`, `ping`) et `GET /activity` (snapshot JSON) sur le panneau.
+- Snapshot **SSR** injecté dans le HTML : le panneau est rempli au premier rendu, avant même la connexion SSE (plus de « Clique Refresh »).
+- Événements `prompt_sent` / `prompt_done` (durée) + rôle étiqueté dans la timeline.
+- `devStatus` expose `writer` (verrou courant).
+
+### Corrigé
+- **Régression 1.3.0** : `lsp` n'existe pas comme outil OMP (le process sort en `code=2`) → les rôles `architect` et `reviewer` ne démarraient plus (`omp_review` cassé). `toolsFor` filtre désormais sur une liste blanche `KNOWN_TOOLS` validée contre OMP 19.2.1, et un test interdit tout nom inconnu.
+
 ## [1.3.0] — 2026-11-27
 
 ### Ajouté

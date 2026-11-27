@@ -31,6 +31,14 @@ const CORS: Record<string, string> = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+// En-têtes de sécurité communs (panneau + flux SSE).
+const SEC_HEADERS: Record<string, string> = {
+  "Content-Security-Policy":
+    "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* http://localhost:*; img-src 'self' data:; frame-ancestors 'none'",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "no-referrer",
+};
+
 const startedAt = Date.now();
 
 function txt(body: string, code = 200, type = "text/plain; charset=utf-8"): Response {
@@ -83,21 +91,28 @@ function originAllowed(req: Request): boolean {
 // Cache mémoire du panneau (invalidé par mtime) : évite une lecture disque par requête.
 let panelCache: { mtimeMs: number; body: string } | null = null;
 
-function panelResponse(): Response {
+function panelResponse(url: URL): Response {
   const p = join(import.meta.dir, "panel.html");
   try {
     const st = statSync(p);
     if (!panelCache || panelCache.mtimeMs !== st.mtimeMs) {
       panelCache = { mtimeMs: st.mtimeMs, body: readFileSync(p, "utf8") };
     }
-    return new Response(panelCache.body, {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Content-Security-Policy":
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* http://localhost:*; img-src 'self' data:; frame-ancestors 'none'",
-      "X-Content-Type-Options": "nosniff",
-      "Referrer-Policy": "no-referrer",
-    },
+    // Snapshot SSR : le panneau affiche l'activité dès le premier rendu,
+    // avant même que le flux SSE ne se connecte (pas de flash vide).
+    // `</` échappé pour ne jamais fermer le <script> prématurément.
+    let snap = "{}";
+    try {
+      snap = JSON.stringify(
+        activitySnapshot(url.searchParams.get("workspace") ?? undefined),
+      ).replace(/<\//g, "<\\/");
+    } catch {}
+    const html = panelCache.body.replace(
+      "<!--BOOTSTRAP-->",
+      `<script id="bootstrap" type="application/json">${snap}</script>`,
+    );
+    return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8", ...SEC_HEADERS },
   });
   } catch {
     return txt("panel.html manquant", 500);
@@ -126,6 +141,81 @@ function health() {
     sessions: sessionList().length,
     events: eventList({ limit: 1 }).length > 0,
   };
+}
+
+/** Snapshot complet pour le panneau : statut dev + timeline des événements. */
+export function activitySnapshot(workspace?: string) {
+  let ws = defaultWorkspace();
+  try {
+    ws = safeWorkspace(workspace ?? undefined);
+  } catch {}
+  let status: any = null;
+  try {
+    status = devStatus(ws);
+  } catch (e: any) {
+    status = { error: String(e?.message ?? e) };
+  }
+  return {
+    workspace: ws,
+    status,
+    events: eventList({ limit: 60 }).reverse(),
+    omp_version: ompVersion(),
+  };
+}
+
+/**
+ * Flux SSE : snapshot initial puis événements au fil de l'eau.
+ * Utilisé par le panneau (inline MCP App et page locale) pour l'affichage live.
+ */
+function streamEvents(req: Request, url: URL): Response {
+  const workspace = url.searchParams.get("workspace") ?? undefined;
+  const enc = new TextEncoder();
+  let lastId = Number(url.searchParams.get("since") ?? 0) || 0;
+  if (!lastId) {
+    const latest = eventList({ limit: 1 });
+    lastId = latest[0]?.id ?? 0;
+  }
+  let timer: ReturnType<typeof setInterval> | null = null;
+  const stream = new ReadableStream({
+    start(ctrl) {
+      const send = (event: string, data: unknown) => {
+        try {
+          ctrl.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        } catch {}
+      };
+      send("snapshot", activitySnapshot(workspace));
+      let tick = 0;
+      timer = setInterval(() => {
+        try {
+          for (const e of eventList({ since: lastId, limit: 100 })) {
+            lastId = Math.max(lastId, e.id ?? lastId);
+            send("event", e);
+          }
+          if (++tick % 10 === 0) send("ping", { t: Date.now(), sessions: sessionList().length });
+        } catch (e: any) {
+          send("error", { message: String(e?.message ?? e) });
+        }
+      }, 700);
+      req.signal.addEventListener("abort", () => {
+        if (timer) clearInterval(timer);
+        try {
+          ctrl.close();
+        } catch {}
+      });
+    },
+    cancel() {
+      if (timer) clearInterval(timer);
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-store",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+      ...SEC_HEADERS,
+    },
+  });
 }
 
 // --- Rate-limit des POST sans token : Token défini = auth, pas de plafond.
@@ -162,7 +252,17 @@ export function createPanelServer(opts: { port?: number; hostname?: string } = {
     if (req.method === "GET" && url.pathname === "/healthz") return json(health());
 
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/panel")) {
-      return panelResponse();
+      return panelResponse(url);
+    }
+
+    // Lecture seule du panneau : auth si un token est configuré.
+    if (req.method === "GET" && url.pathname === "/activity") {
+      if (!authorized(req, url)) return txt("token requis", 401);
+      return json(activitySnapshot(url.searchParams.get("workspace") ?? undefined));
+    }
+    if (req.method === "GET" && url.pathname === "/stream") {
+      if (!authorized(req, url)) return txt("token requis", 401);
+      return streamEvents(req, url);
     }
 
     if (req.method === "POST" && url.pathname.startsWith("/mcp/")) {

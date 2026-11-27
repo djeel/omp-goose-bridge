@@ -142,17 +142,24 @@ server.tool(
   "omp_dev_panel",
   "Affiche le panneau OMP Bridge inline dans le chat (sessions, branche, diff, writer)",
   {},
-  async () => ({
-    content: [
-      {
-        type: "text",
-        text:
-          "Panneau OMP Bridge affiché ci-dessus. " +
-          `Si rien ne s'affiche (client sans MCP Apps), fallback : http://127.0.0.1:${HTTP_PORT}/`,
-      },
-    ],
-    _meta: { ui: { resourceUri: PANEL_URI } },
-  })
+  async () => {
+    // Résumé utile même si le client ne rend pas le MCP App (chat texte).
+    const holder = writerHolder(ws());
+    const live = [
+      `${sessionList().length} session(s)`,
+      holder ? `writer=${holder}` : "writer libre",
+      `live: http://127.0.0.1:${HTTP_PORT}/`,
+    ].join(" · ");
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Panneau OMP Bridge affiché ci-dessus — ${live}`,
+        },
+      ],
+      _meta: { ui: { resourceUri: PANEL_URI } },
+    };
+  }
 );
 
 server.tool(

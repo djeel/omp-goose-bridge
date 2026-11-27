@@ -31,7 +31,7 @@ Goose (Desktop / CLI)               OMP Bridge                         OMP
 | `src/events/store.ts` | Journal SQLite (WAL, `synchronous=NORMAL`, `busy_timeout`), rétention par prune tous les 200 inserts. |
 | `src/mcp/server.ts` | Serveur MCP : 19 outils, ressource `ui://omp-bridge/dev-panel`, arrêt propre (SIGINT/SIGTERM/beforeExit/uncaught). |
 | `src/apps/serve.ts` | Panneau HTTP local : anti-CSRF (Origin), token à temps constant, rate-limit des POST sans token (429), CSP, endpoints JSON. `healthz`/`omp_health` exposent `omp_version` + `omp_supported`. |
-| `src/apps/panel.html` | Client MCP App (thème, resize, send-to-chat) avec fallback standalone. |
+| `src/apps/panel.html` | Client MCP App : timeline live (SSE), KPI, thème, resize, send-to-chat ; fallback standalone. |
 
 ## Modèle d'autorité (invariant central)
 

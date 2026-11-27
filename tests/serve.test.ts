@@ -109,6 +109,30 @@ describe("panneau HTTP", () => {
     }
   });
 
+  test("GET /activity renvoie statut + timeline", async () => {
+    const r = await fetch(`${base}/activity?workspace=/tmp`);
+    expect(r.status).toBe(200);
+    const j: any = await r.json();
+    expect(j.workspace).toBe("/tmp");
+    expect(Array.isArray(j.events)).toBe(true);
+    expect(j.status).toBeDefined();
+  });
+
+  test("GET /stream pousse un snapshot SSE", async () => {
+    const ctrl = new AbortController();
+    const r = await fetch(`${base}/stream?workspace=/tmp`, { signal: ctrl.signal });
+    expect(r.headers.get("content-type")).toContain("text/event-stream");
+    const reader = r.body!.getReader();
+    const { value } = await reader.read();
+    const txt = new TextDecoder().decode(value);
+    expect(txt).toContain("event: snapshot");
+    expect(txt).toContain("\"events\"");
+    ctrl.abort();
+    try {
+      await reader.cancel();
+    } catch {}
+  });
+
   test("omp_dev_status_json renvoie du JSON structuré", async () => {
     const r = await fetch(`${base}/mcp/omp_dev_status_json`, {
       method: "POST",

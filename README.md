@@ -4,7 +4,7 @@ Bridge **MCP** qui donne à [Goose](https://block.github.io/goose/) un moteur d'
 
 Goose orchestre et décide ; OMP exécute dans des sessions isolées. Le bridge expose 19 outils MCP, un panneau de suivi (MCP App inline + page web locale), des recipes, des agents et des slash commands.
 
-> **English TL;DR** — An MCP bridge that lets [Goose](https://block.github.io/goose/) delegate work to an external **OMP** engine over RPC, with a hard rule: **one writer per workspace** (read-only roles are enforced process-side). 19 MCP tools, inline MCP App panel, SQLite event log, recipes/agents, 74 tests, MIT. Full docs below are in French; see [`.env.example`](.env.example) for configuration.
+> **English TL;DR** — An MCP bridge that lets [Goose](https://block.github.io/goose/) delegate work to an external **OMP** engine over RPC, with a hard rule: **one writer per workspace** (read-only roles are enforced process-side). 19 MCP tools, inline MCP App panel, SQLite event log, recipes/agents, live panel (SSE), 77 tests, MIT. Full docs below are in French; see [`.env.example`](.env.example) for configuration.
 
 ```
 Goose (Desktop / CLI)
@@ -67,15 +67,38 @@ Redémarre Goose. Vérifie que les outils `omp_*` apparaissent.
 
 > **Desktop Flatpak** : utilise `cmd: flatpak-spawn` et `args: ["--host", "bun", "/chemin/.../src/mcp/server.ts"]`.
 
-## Panneau
+## Panneau (activité live)
+
+![Panneau OMP Bridge en direct](docs/panel-live.png)
 
 ```bash
 bun run panel     # http://127.0.0.1:3210/ (bind localhost uniquement)
 ```
 
-- Dans le chat : outil `omp_dev_panel` (MCP App inline)
-- Page web : `/` — boutons Refresh / Diff / Sessions / Événements
-- API : `POST /mcp/{omp_dev_status,omp_get_diff,omp_sessions_list,omp_events_list}`
+Trois façons de voir ce que fait OMP, de la plus intégrée à la plus autonome :
+
+| Où | Comment | Contenu |
+|---|---|---|
+| Chat Goose | outil `omp_dev_panel` → MCP App inline | timeline live + KPI + diff |
+| Fenêtre Goose | sidebar **Apps** → *omp-dev-panel* (HTML importé) | même panneau, plein écran |
+| Navigateur | `http://127.0.0.1:3210/` | même panneau, autonome |
+
+**Ce que la timeline montre** (mise à jour en direct, sans bouton Refresh) :
+
+```
+22:36:50  ROUTE    delegate=true role=researcher (mot-clé recherche/docs)
+22:36:50  SESSION  create ws=/projets/app role=researcher label=auto-researcher
+22:36:50  → OMP    role=researcher chars=193 : Tu es OMP Researcher…
+22:37:08  RÉSULTAT prompt_result status=completed settled=true
+22:37:08  ✓ OMP    role=researcher durée=24.2s status=completed
+22:37:08  STOP     stop role=researcher
+```
+
+KPI affichés : sessions vivantes, verrou writer, pool read-only (au repos · hits/misses), branche ±fichiers modifiés, version OMP.
+
+- API lecture : `GET /activity?workspace=…` (snapshot JSON), `GET /stream` (SSE : `snapshot`, `event`, `ping`)
+- API actions : `POST /mcp/{omp_dev_status,omp_get_diff,omp_sessions_list,omp_events_list}`
+- Le panneau est amorcé côté serveur (snapshot SSR) puis suit le flux SSE : il est déjà rempli au premier rendu.
 
 Les outils nécessitant le process OMP (`omp_auto`, `omp_review`, `omp_run_role`, `omp_session_prompt`) restent côté MCP.
 
@@ -154,7 +177,7 @@ bun run probe                                  # handshake RPC réel
 bun run ci        # typecheck + lint + tests (ce que fait la CI)
 bun run check     # tsc --noEmit
 bun run lint      # biome lint .
-bun test          # 74 tests : guard, router, events, status, HTTP, client RPC (fake OMP), rôles, pool, config
+bun test          # 77 tests : guard, router, events, status, HTTP, client RPC (fake OMP), rôles, pool, config
 bun run bench     # micro-benchmarks des chemins chauds
 bun run probe     # handshake RPC réel avec OMP
 ```

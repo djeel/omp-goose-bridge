@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 
-const { toolsFor, gitDiff, gitDiffParts, REVIEW_GATE } = await import("../src/core/roles.js");
+const { toolsFor, KNOWN_TOOLS, gitDiff, gitDiffParts, REVIEW_GATE } = await import("../src/core/roles.js");
 
 describe("toolsFor", () => {
   test("developer = seul writer complet", () => {
@@ -22,12 +22,22 @@ describe("toolsFor", () => {
     }
   });
 
-  test("architect/reviewer naviguent le code (lsp), sans mutation", () => {
+  test("architect/reviewer lisent le code, sans mutation ni tool inconnu", () => {
     for (const role of ["architect", "reviewer"] as const) {
       const t = toolsFor(role).split(",");
-      expect(t).toContain("lsp");
+      expect(t).toContain("read");
       for (const banned of ["edit", "write", "bash", "task"]) {
         expect(t).not.toContain(banned);
+      }
+      // Régression : "lsp" n'existe pas comme outil OMP (process code=2 au start).
+      expect(t).not.toContain("lsp");
+    }
+  });
+
+  test("aucun rôle n'expose un tool inconnu d'OMP", () => {
+    for (const role of ["developer", "researcher", "architect", "reviewer"] as const) {
+      for (const tool of toolsFor(role).split(",").filter(Boolean)) {
+        expect(KNOWN_TOOLS.has(tool)).toBe(true);
       }
     }
   });

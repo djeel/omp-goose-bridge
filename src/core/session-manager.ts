@@ -52,6 +52,7 @@ export async function sessionCreate(opts: {
     throw e;
   }
   rpc.setBridgeSessionId(id);
+  rpc.setBridgeRole(role);
   const s: ManagedSession = {
     id,
     workspace: ws,

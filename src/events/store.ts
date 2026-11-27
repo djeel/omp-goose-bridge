@@ -63,9 +63,16 @@ export function eventList(opts: {
   session_id?: string;
   kind?: string;
   limit?: number;
+  /** Streaming : ne renvoie que les événements d'id > since, en ordre croissant. */
+  since?: number;
 }): BridgeEvent[] {
   const d = eventsDb();
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
+  if (opts.since !== undefined) {
+    return d
+      .query(`SELECT * FROM events WHERE id > ? ORDER BY id ASC LIMIT ?`)
+      .all(opts.since, limit) as BridgeEvent[];
+  }
   if (opts.session_id && opts.kind) {
     return d
       .query(`SELECT * FROM events WHERE session_id=? AND kind=? ORDER BY id DESC LIMIT ?`)

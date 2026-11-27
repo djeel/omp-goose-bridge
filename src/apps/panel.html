@@ -4,49 +4,105 @@
 <meta charset="UTF-8">
 <title>OMP Bridge — panneau dev</title>
 <script type="application/ld+json">
-{"@context":"urn:goose.ai:schema","@type":"GooseApp","name":"omp-dev-panel","description":"Panneau OMP Bridge : sessions, branche, diff, writer","width":900,"height":640,"resizable":true}
+{"@context":"urn:goose.ai:schema","@type":"GooseApp","name":"omp-dev-panel","description":"Panneau OMP Bridge : activité live Goose → OMP, sessions, writer, diff","width":900,"height":620,"resizable":true}
 </script>
 <style>
 *{box-sizing:border-box}
-body{margin:0;font:14px system-ui;padding:16px;min-height:100vh}
+body{margin:0;font:13px/1.45 system-ui,sans-serif;padding:14px}
 body.dark{background:#101014;color:#e8e3f0}
-body.light{background:#f5f5f7;color:#1d1d1f}
-h1{font-size:18px;margin:0 0 12px}
-.card{border-radius:10px;padding:12px;margin-bottom:12px}
+body.light{background:#f6f6f8;color:#1d1d1f}
+h1{font-size:17px;margin:0;display:flex;align-items:center;gap:8px}
+.card{border-radius:10px;padding:10px 12px;margin-bottom:10px}
 body.dark .card{background:#1a1a22;border:1px solid #2c2c3a}
-body.light .card{background:#fff;border:1px solid #ddd;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-button{border-radius:8px;padding:8px 12px;cursor:pointer;font-weight:600}
-body.dark button{background:#2a2a3a;color:#eee;border:1px solid #444}
+body.light .card{background:#fff;border:1px solid #e2e2e6}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.kpi{padding:8px 10px;border-radius:8px}
+body.dark .kpi{background:#14141b;border:1px solid #262633}
+body.light .kpi{background:#fafafc;border:1px solid #ececf1}
+.kpi b{display:block;font-size:16px;line-height:1.2}
+.kpi span{font-size:11px;opacity:.65;text-transform:uppercase;letter-spacing:.04em}
+.dot{width:8px;height:8px;border-radius:50%;background:#888;display:inline-block}
+.dot.on{background:#34c759;box-shadow:0 0 0 3px rgba(52,199,89,.18)}
+.dot.off{background:#ff453a}
+#conn{font-size:12px;opacity:.8;margin-left:auto}
+button{border-radius:8px;padding:6px 10px;cursor:pointer;font-weight:600;font-size:12px}
+body.dark button{background:#262634;color:#eee;border:1px solid #3a3a4a}
 body.light button{background:#0071e3;color:#fff;border:1px solid #0071e3}
 button:hover{opacity:.85}
-pre{border-radius:8px;padding:10px;overflow:auto;max-height:320px;white-space:pre-wrap}
-body.dark pre{background:#0c0c10;border:1px solid #2a2a35}
-body.light pre{background:#f5f5f7;border:1px solid #ddd}
-input{width:100%;padding:8px;border-radius:8px}
+input{width:100%;padding:7px;border-radius:8px;font-size:12px}
 body.dark input{background:#0e0e13;color:#eee;border:1px solid #333}
 body.light input{background:#fff;color:#1d1d1f;border:1px solid #ccc}
-.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;background:#244;color:#fff}
-h3{margin:0 0 8px;font-size:14px}
-.hint{font-size:12px;opacity:.65;margin-top:6px}
+#timeline{list-style:none;margin:0;padding:0;max-height:300px;overflow:auto}
+#timeline li{display:grid;grid-template-columns:56px 74px 1fr;gap:8px;align-items:baseline;
+  padding:5px 2px;border-bottom:1px dashed rgba(128,128,128,.18);font-size:12px}
+#timeline li:last-child{border-bottom:0}
+t{opacity:.5;font-variant-numeric:tabular-nums;font-size:11px}
+.chip{font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px;text-align:center;
+  text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-prompt{background:#0a3d62;color:#bfe4ff}
+.c-done{background:#0b3d1e;color:#a8f0c0}
+.c-route{background:#3b2a5a;color:#d9c6ff}
+.c-session{background:#123c3c;color:#a8eeea}
+.c-stop{background:#2b2b2b;color:#bbb}
+.c-sub{background:#4a2f10;color:#ffd8a8}
+.c-other{background:#33333f;color:#ccc}
+body.light .c-prompt{background:#dbeafe;color:#1e40af}
+body.light .c-done{background:#dcfce7;color:#166534}
+body.light .c-route{background:#ede9fe;color:#5b21b6}
+body.light .c-session{background:#ccfbf1;color:#115e59}
+body.light .c-stop{background:#eee;color:#555}
+body.light .c-sub{background:#ffedd5;color:#9a3412}
+body.light .c-other{background:#eee;color:#444}
+.sum{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sid{opacity:.45;font-size:10px}
+pre{border-radius:8px;padding:9px;overflow:auto;max-height:260px;white-space:pre-wrap;font-size:11px}
+body.dark pre{background:#0c0c10;border:1px solid #2a2a35}
+body.light pre{background:#f5f5f7;border:1px solid #ddd}
+details summary{cursor:pointer;font-weight:600;font-size:12px;opacity:.8}
+h3{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;opacity:.7}
+.hint{font-size:11px;opacity:.6;margin-top:6px}
+.empty{font-size:12px;opacity:.6;padding:6px 2px}
 </style>
 </head>
 <body class="dark">
-<h1>OMP Bridge <span class="badge" id="conn">Offline</span></h1>
-<div class="card"><div class="row">
-<button id="bRefresh">Refresh</button>
-<button id="bDiff">Diff</button>
-<button id="bList">Sessions</button>
-<button id="bEvents">Événements</button>
-<button id="bHealth">Santé</button>
-<button id="bSend">Envoyer au chat</button>
-</div></div>
-<div class="card">
-<h3>Workspace</h3>
-<input id="ws" placeholder="chemin du workspace (vide = défaut serveur)">
-<div class="hint">Doit être sous une racine autorisée (OMP_BRIDGE_ROOTS).</div>
+<!--BOOTSTRAP-->
+<div class="row" style="margin-bottom:10px">
+  <h1>OMP Bridge <span class="dot off" id="dot"></span></h1>
+  <span id="conn">connexion…</span>
 </div>
-<div class="card"><h3>Status</h3><pre id="out">Clique Refresh.</pre></div>
+
+<div class="card">
+  <div class="kpis">
+    <div class="kpi"><span>Sessions</span><b id="kSess">–</b></div>
+    <div class="kpi"><span>Writer</span><b id="kWriter">–</b></div>
+    <div class="kpi"><span>Pool</span><b id="kPool">–</b></div>
+    <div class="kpi"><span>Branche</span><b id="kBranch">–</b></div>
+    <div class="kpi"><span>OMP</span><b id="kOmp">–</b></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Activité Goose → OMP</h3>
+  <ul id="timeline"><li class="empty">En attente d'événements…</li></ul>
+</div>
+
+<div class="card">
+  <div class="row">
+    <input id="ws" placeholder="workspace (vide = défaut serveur)">
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button id="bDiff">Diff</button>
+    <button id="bList">Sessions</button>
+    <button id="bEvents">Événements</button>
+    <button id="bHealth">Santé</button>
+    <button id="bSend">Envoyer au chat</button>
+  </div>
+  <div class="hint">Doit être sous une racine autorisée (OMP_BRIDGE_ROOTS).</div>
+</div>
+
+<details class="card"><summary>Détail</summary><pre id="out">—</pre></details>
+
 <script>
 "use strict";
 // --- Client MCP App (inline chat) : thème + resize + send-to-chat. Silencieux en standalone.
@@ -59,7 +115,7 @@ class McpAppClient {
     if(theme)this.applyTheme(theme);
     else this.applyTheme(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");
     this.notify("ui/notifications/initialized",{});this.size();
-  }catch(e){/* standalone : pas d'hôte */ this.applyTheme(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");}}
+  }catch(e){this.applyTheme(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");}}
   onMsg(e){const d=e.data;if(!d||typeof d!=="object")return;
     if("id" in d&&this.pending.has(d.id)){const p=this.pending.get(d.id);
       this.pending.delete(d.id);d.error?p.reject(new Error(d.error.message)):p.resolve(d.result);return;}
@@ -76,13 +132,14 @@ class McpAppClient {
 }
 const mcpApp=new McpAppClient();
 
-// Base HTTP : même origine si servie par serve.ts, sinon port configurable.
+// --- Base HTTP : même origine si servie par serve.ts, sinon port du service local.
 function apiBase(){
   if(location.protocol==="http:"||location.protocol==="https:")return location.origin;
   const p=window.OMP_BRIDGE_HTTP||3210;
   return "http://127.0.0.1:"+p;
 }
 const TOKEN=new URLSearchParams(location.search).get("token")||"";
+function authQuery(){return TOKEN?("token="+encodeURIComponent(TOKEN)):"";}
 function headers(){
   const h={"Content-Type":"application/json"};
   if(TOKEN)h["x-omp-bridge-token"]=TOKEN;
@@ -95,25 +152,135 @@ async function api(tool,args){
   return await r.text();
 }
 function ws(){return document.getElementById("ws").value.trim();}
+function wsQ(){const w=ws();return w?("workspace="+encodeURIComponent(w)+(TOKEN?"&"+authQuery():"")):(authQuery()?authQuery():"");}
 function wsArg(){const w=ws();return w?{workspace:w}:{};}
-function ok(v){document.getElementById("conn").textContent=v?"Connected":"Offline";}
 function show(t){document.getElementById("out").textContent=t;mcpApp.size();}
-async function run(tool,args){
-  try{show(await api(tool,args));ok(true);}
-  catch(e){show("Panneau HTTP injoignable — lancer : bun src/apps/serve.ts\n"+e);ok(false);}
+function connected(on,label){
+  document.getElementById("dot").className="dot "+(on?"on":"off");
+  document.getElementById("conn").textContent=label||(on?"live":"hors ligne");
 }
-document.getElementById("bRefresh").onclick=()=>run("omp_dev_status",wsArg());
+
+// --- rendu des KPI depuis un statut (devStatus) ---
+function renderKpis(st){
+  if(!st)return;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set("kSess",String(st.sessions?st.sessions.length:0));
+  set("kWriter",st.writer||"libre");
+  set("kPool",st.pool?(st.pool.pooled+" · "+st.pool.hits+"/"+st.pool.misses):"–");
+  set("kBranch",st.isRepo?(st.branch+(st.dirty?(" ±"+st.dirty):"")):"hors dépôt");
+}
+
+// --- timeline ---
+const KIND={
+  prompt_sent:["→ OMP","c-prompt"],
+  prompt_done:["✓ OMP","c-done"],
+  prompt_result:["résultat","c-done"],
+  bridge_route:["route","c-route"],
+  bridge_session_create:["session","c-session"],
+  bridge_session_stop:["stop","c-stop"],
+  subagent_progress:["subagent","c-sub"],
+  subagent_lifecycle:["subagent","c-sub"],
+  session_settled:["settled","c-stop"],
+};
+const seen=new Set();
+function addEvent(e){
+  if(!e||e.id==null||seen.has(e.id))return;
+  seen.add(e.id);
+  const ul=document.getElementById("timeline");
+  const empty=ul.querySelector(".empty");if(empty)empty.remove();
+  const [label,cls]=KIND[e.kind]||[e.kind,"c-other"];
+  const li=document.createElement("li");
+  const hh=new Date(e.ts).toLocaleTimeString();
+  li.innerHTML='<t></t><span class="chip '+cls+'"></span><span class="sum"></span>';
+  li.querySelector("t").textContent=hh;
+  li.querySelector(".chip").textContent=label;
+  const sum=li.querySelector(".sum");
+  sum.textContent=e.summary||"";
+  sum.title=(e.summary||"")+"\nsession "+e.session_id;
+  const sid=document.createElement("span");sid.className="sid";sid.textContent=" "+e.session_id;
+  sum.appendChild(sid);
+  ul.appendChild(li);
+  while(ul.children.length>80)ul.removeChild(ul.firstChild);
+  ul.scrollTop=ul.scrollHeight;
+}
+
+// --- flux live (SSE) + repli polling ---
+let es=null;
+function startStream(){
+  const q=wsQ();
+  const url=apiBase()+"/stream"+(q?("?"+q):"");
+  try{
+    es=new EventSource(url);
+  }catch(e){return startPolling();}
+  es.addEventListener("snapshot",ev=>{
+    const d=JSON.parse(ev.data);
+    connected(true,"live · "+d.workspace);
+    renderKpis(d.status);
+    if(d.omp_version)document.getElementById("kOmp").textContent=d.omp_version.replace(/^omp\//,"");
+    (d.events||[]).forEach(addEvent);
+    mcpApp.size();
+  });
+  es.addEventListener("event",ev=>{addEvent(JSON.parse(ev.data));mcpApp.size();});
+  es.addEventListener("ping",ev=>{
+    const d=JSON.parse(ev.data);
+    const k=document.getElementById("kSess");
+    if(k&&typeof d.sessions==="number")k.textContent=String(d.sessions);
+  });
+  es.onerror=()=>{connected(false,"reconnexion…");};
+}
+function startPolling(){
+  const loop=async()=>{
+    try{
+      const q=wsQ();
+      const r=await fetch(apiBase()+"/activity"+(q?("?"+q):""));
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      const d=await r.json();
+      connected(true,"live (poll) · "+d.workspace);
+      renderKpis(d.status);
+      if(d.omp_version)document.getElementById("kOmp").textContent=d.omp_version.replace(/^omp\//,"");
+      (d.events||[]).forEach(addEvent);
+      mcpApp.size();
+    }catch(e){connected(false,"hors ligne — lancer : bun run panel");}
+    setTimeout(loop,3000);
+  };
+  loop();
+}
+
+// --- actions ---
+async function run(tool,args){
+  try{show(await api(tool,args));}
+  catch(e){show("Panneau HTTP injoignable — lancer : bun run panel\n"+e);connected(false);}
+}
 document.getElementById("bDiff").onclick=()=>run("omp_get_diff",wsArg());
 document.getElementById("bList").onclick=()=>run("omp_sessions_list",{});
 document.getElementById("bEvents").onclick=()=>run("omp_events_list",{});
 document.getElementById("bHealth").onclick=async()=>{
-  try{const r=await fetch(apiBase()+"/healthz");show(JSON.stringify(await r.json(),null,1));ok(true);}
-  catch(e){show("Panneau HTTP injoignable — lancer : bun src/apps/serve.ts\n"+e);ok(false);}
+  try{const r=await fetch(apiBase()+"/healthz");show(JSON.stringify(await r.json(),null,1));}
+  catch(e){show("Panneau HTTP injoignable — lancer : bun run panel\n"+e);}
 };
 document.getElementById("bSend").onclick=async()=>{
   const t=document.getElementById("out").textContent;
   try{await mcpApp.send("OMP Bridge — panneau :\n"+t);}catch(e){show("Envoi chat impossible (mode standalone).\n"+e);}
 };
+document.getElementById("ws").addEventListener("change",()=>{
+  if(es){es.close();es=null;seen.clear();document.getElementById("timeline").innerHTML='<li class="empty">Filtre workspace…</li>';}
+  startStream();
+});
+
+// --- amorçage : snapshot injecté par le serveur (affichage instantané, sans flash vide) ---
+const boot=document.getElementById("bootstrap");
+if(boot){
+  try{
+    const d=JSON.parse(boot.textContent||"{}");
+    if(d.workspace){document.getElementById("ws").value=d.workspace;connected(true,"live · "+d.workspace);}
+    renderKpis(d.status);
+    if(d.omp_version)document.getElementById("kOmp").textContent=d.omp_version.replace(/^omp\//,"");
+    (d.events||[]).forEach(addEvent);
+  }catch(e){}
+}
+
+// Démarrage : live immédiat (plus de bouton Refresh nécessaire).
+startStream();
 </script>
 </body>
 </html>
